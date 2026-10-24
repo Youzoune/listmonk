@@ -150,6 +150,14 @@ type Queries struct {
 	DeleteRole            *sqlx.Stmt `query:"delete-role"`
 	UpsertListPermissions *sqlx.Stmt `query:"upsert-list-permissions"`
 	DeleteListPermission  *sqlx.Stmt `query:"delete-list-permission"`
+
+	GetProjects       *sqlx.Stmt `query:"get-projects"`
+	GetProject        *sqlx.Stmt `query:"get-project"`
+	CreateProject     *sqlx.Stmt `query:"create-project"`
+	UpdateProject     *sqlx.Stmt `query:"update-project"`
+	DeleteProject     *sqlx.Stmt `query:"delete-project"`
+	GetUserProjectIDs *sqlx.Stmt `query:"get-user-project-ids"`
+	SetUserProjects   *sqlx.Stmt `query:"set-user-projects"`
 }
 
 // ApplyOrphanFilter handles the special subscription_status value "none", which

@@ -1,4 +1,6 @@
 -- name: create-user
+-- New users get access to the default project.
+WITH u AS (
 INSERT INTO users (username, password_login, password, email, name, type, user_role_id, list_role_id, status)
     VALUES($1, $2, (
         CASE
@@ -10,7 +12,12 @@ INSERT INTO users (username, password_login, password, email, name, type, user_r
                 THEN $3
             ELSE NULL
         END
-    ), $4, $5, $6, (SELECT id FROM roles WHERE id = $7 AND type = 'user'), (SELECT id FROM roles WHERE id = $8 AND type = 'list'), $9) RETURNING id;
+    ), $4, $5, $6, (SELECT id FROM roles WHERE id = $7 AND type = 'user'), (SELECT id FROM roles WHERE id = $8 AND type = 'list'), $9) RETURNING id
+),
+p AS (
+    INSERT INTO user_projects (user_id, project_id) SELECT id, 1 FROM u
+)
+SELECT id FROM u;
 
 -- name: update-user
 WITH u AS (

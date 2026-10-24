@@ -372,7 +372,7 @@ func (c *Core) InsertSubscriber(sub models.Subscriber, listIDs []int, listUUIDs 
 		pq.Array(listIDs),
 		pq.Array(listUUIDs),
 		subStatus); err != nil {
-		if pqErr, ok := err.(*pq.Error); ok && pqErr.Constraint == "subscribers_email_key" {
+		if pqErr, ok := err.(*pq.Error); ok && pqErr.Constraint == "idx_subs_project_email" {
 			return models.Subscriber{}, false, echo.NewHTTPError(http.StatusConflict, c.i18n.T("subscribers.emailExists"))
 		} else {
 			// return sub.Subscriber, errSubscriberExists

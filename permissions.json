@@ -67,6 +67,14 @@
         ]
     },
     {
+        "group": "projects",
+        "permissions":
+        [
+            "projects:get",
+            "projects:manage"
+        ]
+    },
+    {
         "group": "settings",
         "permissions":
         [
