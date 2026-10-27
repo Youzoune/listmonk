@@ -540,3 +540,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 .totp-side { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 8px; }
 .totp-secret { word-break: break-all; padding: 8px 10px; background: var(--surface-2); border-radius: var(--r-sm); margin: 0; }
 .side-foot a.me-link[aria-current="page"] { background: var(--surface); color: var(--fg); box-shadow: inset 0 0 0 1px var(--line); }
+.grow { flex: 1 1 220px; min-width: 0; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); padding: 10px 12px; min-height: 44px; font: inherit; color: inherit; }
+.empty-cta { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; border-style: dashed; }
+.provider-list .choice { text-align: left; width: 100%; background: var(--surface); font: inherit; color: inherit; }
+.provider-list .choice:hover { border-color: var(--fg); }

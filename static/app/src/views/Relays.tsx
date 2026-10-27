@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRelays, useSaveRelay } from '../api/hooks';
 import type { Relay, RelayCadence, RelayWarmup } from '../api/types';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { Chip, ErrorState, Explain, Icon, Loading } from '../components/ui';
 import { dateTime, num } from '../lib/format';
 import { PRESETS, applyPreset, matchingPreset, type Preset } from '../lib/presets';
@@ -314,11 +314,17 @@ function RelayEditor({ relay }: { relay: Relay }) {
 }
 
 export function Relays() {
-  const { project } = useProject();
+  const { project, can } = useProject();
   const relays = useRelays(project.id);
+  const [params] = useSearchParams();
+  // ?relais=ovh selects a relay just created.
+  const asked = params.get('relais');
   const [selected, setSelected] = useState<string | null>(null);
   const list = relays.data ?? [];
-  const current = list.find((r) => (r.uuid || r.name) === selected) ?? list.find((r) => !r.pool) ?? list[0];
+  const current = list.find((r) => (r.uuid || r.name) === selected)
+    ?? (asked ? list.find((r) => r.name === asked || r.name === `email-${asked}`) : undefined)
+    ?? list.find((r) => !r.pool) ?? list[0];
+  const dedicated = list.filter((r) => !r.pool && r.name && r.name !== 'email').length;
 
   useEffect(() => setSelected(null), [project.id]);
 
@@ -329,8 +335,33 @@ export function Relays() {
           <p className="eyebrow">{project.name}</p>
           <h1>Relais d’envoi</h1>
         </div>
-        <Link className="btn" to="/guide"><Icon name="book" size={16} /> Comprendre le spam et le warm-up</Link>
+        <div className="row-gap">
+          <Link className="btn" to="/guide"><Icon name="book" size={16} /> Comprendre le spam et le warm-up</Link>
+          {can('settings:manage') && <Link className="btn btn-primary" to="/relais/nouveau"><Icon name="plus" /> Nouveau relais</Link>}
+        </div>
       </header>
+
+      <Explain title="Un relais, c’est quoi ?">
+        <p>
+          C’est le serveur qui remet vos e-mails aux boîtes de réception : votre messagerie (OVH, Google, Microsoft) ou un service
+          d’envoi (Brevo, Mailjet, Amazon SES). Chaque relais a son rythme : combien d’e-mails par minute, par heure, par jour,
+          à quelles heures, et une montée progressive (le warm-up) pour ne pas finir en spam.
+        </p>
+        <p>
+          Le <span className="strong">relais par défaut</span> répartit les envois sur les serveurs partagés. Pour envoyer depuis
+          une adresse précise avec son propre rythme, créez un relais avec « Nouveau relais » puis choisissez-le dans la campagne.
+        </p>
+      </Explain>
+
+      {!relays.isPending && dedicated === 0 && can('settings:manage') && (
+        <div className="panel empty-cta">
+          <div>
+            <p className="strong">Aucun relais dédié pour l’instant</p>
+            <p className="small muted">Ajoutez l’adresse d’envoi de votre domaine en deux minutes : fournisseur, identifiants, rythme.</p>
+          </div>
+          <Link className="btn btn-primary" to="/relais/nouveau"><Icon name="plus" /> Créer un relais</Link>
+        </div>
+      )}
 
       {relays.isPending ? <Loading /> : relays.isError ? <ErrorState error={relays.error} retry={() => relays.refetch()} /> : (
         <div className="relays">

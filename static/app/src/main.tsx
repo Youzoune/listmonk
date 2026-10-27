@@ -27,6 +27,7 @@ import { NewCampaign } from './views/NewCampaign';
 import { ProjectEdit } from './views/ProjectEdit';
 import { Projects } from './views/Projects';
 import { Relays } from './views/Relays';
+import { NewRelay } from './views/NewRelay';
 import { Settings } from './views/Settings';
 import { SignupForm } from './views/SignupForm';
 import { TemplateEdit, Templates } from './views/Templates';
@@ -72,6 +73,7 @@ const router = createBrowserRouter(
         { path: 'maintenance', element: <Maintenance /> },
         { path: 'compte', element: <Account /> },
         { path: 'relais', element: <Relays /> },
+        { path: 'relais/nouveau', element: <NewRelay /> },
         { path: 'projets', element: <Projects /> },
         { path: 'projets/nouveau', element: <ProjectEdit /> },
         { path: 'projets/:id', element: <ProjectEdit /> },

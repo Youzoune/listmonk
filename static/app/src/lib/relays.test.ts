@@ -44,6 +44,7 @@ describe('summaries', () => {
   it('names relays the way people read them', () => {
     expect(relayName({ name: 'email', pool: true })).toBe('Relais par défaut');
     expect(relayName({ name: 'email-sport-ses', pool: false })).toBe('sport-ses');
+    expect(relayName({ name: '', pool: false, host: 'ssl0.ovh.net' })).toBe('Serveur ssl0.ovh.net');
   });
 
   it('parses relay days as local dates', () => {

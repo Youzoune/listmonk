@@ -53,9 +53,11 @@ export function hasCadence(c: RelayCadence, w: RelayWarmup): boolean {
 }
 
 // "email" is listmonk's default pool; named SMTP servers are called "email-<name>".
-export function relayName(r: Pick<Relay, 'name' | 'pool'>): string {
+// A server saved without a name goes by its address.
+export function relayName(r: Pick<Relay, 'name' | 'pool'> & { host?: string }): string {
   if (r.pool || r.name === 'email') return 'Relais par défaut';
-  return r.name.replace(/^email-/, '');
+  const name = r.name.replace(/^email-/, '');
+  return name || (r.host ? `Serveur ${r.host}` : 'Serveur sans nom');
 }
 
 // "40 / h, 250 / jour · lun. → ven., 9 h – 17 h"
