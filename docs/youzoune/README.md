@@ -16,6 +16,7 @@ Point de départ : `master` upstream au commit `8216c4f1` (après la v7.0.0).
 | 5 | Pages publiques par projet (domaine), désinscription et préférences limitées au projet (voir [pages-publiques.md](pages-publiques.md)) | 5 | fait (pas de migration) |
 | 6 | Fiabilité au redémarrage pendant les envois | 6 | commencé : redémarrage sûr quand les campagnes attendent leur relais (lot 4) |
 | 7 | Front React « Relais » dans `static/app`, servi sous `/app` (voir [static/app/README.md](../../static/app/README.md)) | Front | en cours |
+| — | Déploiement sur Coolify, comme Twenty : image construite depuis les sources, Postgres, sous-domaines par projet (voir [deploy/coolify](../../deploy/coolify/README.md)) | — | prêt, à essayer sur le serveur |
 
 Le détail de conception du multi-projet est dans [multi-projet.md](multi-projet.md).
 

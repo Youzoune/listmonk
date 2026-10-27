@@ -10,6 +10,9 @@ il remplace alors le sous-domaine. Le projet par défaut reste sur l'adresse pri
 
 ## Réglage du serveur
 
+Sur Coolify, tout est prêt : voir [deploy/coolify/README.md](../../deploy/coolify/README.md) (Traefik et certificat
+joker par défi DNS). Le reste de cette section vaut pour un serveur sans Coolify.
+
 Le domaine de base est un réglage du serveur, comme les variables d'environnement de Twenty :
 
 ```toml

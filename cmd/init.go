@@ -493,6 +493,20 @@ func initSettings(query string, db *sqlx.DB, ko *koanf.Koanf) {
 	}
 }
 
+// applyEnvRootURL makes the root URL from the environment the app's root URL,
+// and saves it in the settings so that the settings page shows it.
+func applyEnvRootURL(root string, db *sqlx.DB, ko *koanf.Koanf) {
+	if ko.String("app.root_url") != root {
+		b, _ := json.Marshal(root)
+		if _, err := db.Exec(`UPDATE settings SET value = $1, updated_at = NOW() WHERE key = 'app.root_url'`, types.JSONText(b)); err != nil {
+			lo.Printf("error saving the root URL from the environment: %v", err)
+		}
+	}
+	if err := ko.Set("app.root_url", root); err != nil {
+		lo.Printf("error setting the root URL from the environment: %v", err)
+	}
+}
+
 func initUrlConfig(ko *koanf.Koanf) *UrlConfig {
 	root := strings.TrimSuffix(ko.String("app.root_url"), "/")
 

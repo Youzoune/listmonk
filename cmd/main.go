@@ -140,6 +140,11 @@ func init() {
 		lo.Fatalf("error loading config from env: %v", err)
 	}
 
+	// The public address can come from the environment (LISTMONK_app__root_url),
+	// as on Coolify where it's the service's domain. It then wins over the
+	// value saved in the settings.
+	envRootURL := strings.TrimRight(strings.TrimSpace(ko.String("app.root_url")), "/")
+
 	// Connect to the database.
 	db = initDB()
 
@@ -195,6 +200,9 @@ func init() {
 	// Load settings from DB.
 	if q, ok := qMap["get-settings"]; ok {
 		initSettings(q.Query, db, ko)
+	}
+	if envRootURL != "" {
+		applyEnvRootURL(envRootURL, db, ko)
 	}
 
 	// Prepare queries.
