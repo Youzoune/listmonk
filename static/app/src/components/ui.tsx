@@ -1,5 +1,6 @@
 // Shared building blocks: icons, logo, status chips, meters, charts and states.
 import type { ReactNode } from 'react';
+import { Link } from 'react-router';
 import type { CampaignStatus } from '../api/types';
 
 const ICONS = {
@@ -24,6 +25,8 @@ const ICONS = {
   mail: 'M3 6h18v12H3zM3 7l9 6 9-6',
   x: 'M6 6l12 12M18 6 6 18',
   out: 'M10 17l5-5-5-5M15 12H3M21 4v16',
+  help: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01',
+  book: 'M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 21V5M8 7h7M8 11h5',
 } as const;
 
 export type IconName = keyof typeof ICONS;
@@ -171,5 +174,19 @@ export function Upcoming({ lot, children }: { lot: string; children: ReactNode }
       <span className="chip chip-brand">{lot}</span>
       <p className="small">{children}</p>
     </div>
+  );
+}
+
+// A short plain-language explanation, folded by default, with a link to the
+// matching section of the guide.
+export function Explain({ title, guide, children }: { title: string; guide?: string; children: ReactNode }) {
+  return (
+    <details className="explain">
+      <summary><Icon name="help" size={16} /> {title}</summary>
+      <div className="explain-body">
+        {children}
+        {guide && <p><Link className="link" to={`/guide#${guide}`}>Lire la suite dans le guide</Link></p>}
+      </div>
+    </details>
   );
 }

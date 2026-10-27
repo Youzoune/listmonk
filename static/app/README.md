@@ -37,8 +37,9 @@ cd tests && bun playwright test specs/app.spec.js   # parcours e2e sur /app
 ## Où on en est
 
 * Faits : Aujourd'hui, Campagnes (filtres, recherche, pagination), Nouvelle campagne (assistant en 4 étapes, lancement ou planification),
-  Audience (listes, filtres, recherche), Relais d'envoi (lecture des SMTP et de la cadence globale), Identité.
+  Audience (listes, filtres, recherche), Relais d'envoi, Projets, Identité.
 * La connexion passe encore par la page de l'ancienne admin (`/admin/login`), qui gère déjà la double authentification et OIDC.
 * L'édition détaillée d'une campagne, d'un contact et les réglages ouvrent encore l'ancienne admin.
 * L'en-tête de projet est envoyé, mais l'API ne filtre pas encore par projet : c'est le lot 2.
-* Cadence, plage d'envoi et warm-up par relais : écrans prêts côté calcul (`src/lib/sending.ts`), en attente du lot 4.
+* Relais d'envoi (lot 4) : projet, cadence, plage d'envoi, warm-up et relais système réglables ; estimation de fin
+  dans l'assistant de campagne ; usage du jour sur l'accueil.

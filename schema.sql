@@ -279,6 +279,7 @@ INSERT INTO settings (key, value) VALUES
     ('app.send_optin_confirmation', 'true'),
     ('app.check_updates', 'true'),
     ('app.notify_emails', '[]'),
+    ('app.system_messenger', '""'),
     ('app.lang', '"en"'),
     ('privacy.individual_tracking', 'false'),
     ('privacy.disable_tracking', 'false'),
@@ -438,6 +439,17 @@ DROP TRIGGER IF EXISTS trg_camp_lists_same_project ON campaign_lists;
 CREATE TRIGGER trg_camp_lists_same_project BEFORE INSERT OR UPDATE OF campaign_id, list_id ON campaign_lists
     FOR EACH ROW EXECUTE FUNCTION same_project_list();
 
+
+-- relay_usage: messages sent per relay (messenger) and day, for cadence and warm-up.
+DROP TABLE IF EXISTS relay_usage CASCADE;
+CREATE TABLE relay_usage (
+    relay           TEXT NOT NULL,
+    day             DATE NOT NULL,
+    sent            INT NOT NULL DEFAULT 0,
+    updated_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+    PRIMARY KEY (relay, day)
+);
 
 -- materialized views
 

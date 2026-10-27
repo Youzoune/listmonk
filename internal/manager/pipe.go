@@ -25,9 +25,17 @@ type pipe struct {
 	stopped    atomic.Bool
 	withErrors atomic.Bool
 
+	// Waiting for its relay's cadence, with nothing queued.
+	waiting atomic.Bool
+
 	lastFetched int
 	pending     map[int]struct{}
 	pendingMut  sync.Mutex
+
+	// Subscribers fetched but not sent yet because the relay hit its cadence.
+	// They're sent first on the next round. They stay in pending until sent,
+	// so the checkpoint never skips them.
+	backlog []models.Subscriber
 
 	m *Manager
 }
@@ -92,30 +100,41 @@ func (m *Manager) newPipe(c *models.Campaign) (*pipe, error) {
 // It returns a bool indicating whether any subscribers were processed
 // in the current batch or not. A false indicates that all subscribers
 // have been processed, or that a campaign has been paused or cancelled.
-func (p *pipe) NextSubscribers() (bool, error) {
+// A non-zero duration means that the campaign's relay hit its cadence and
+// that the pipe should be retried after that long.
+func (p *pipe) NextSubscribers() (bool, time.Duration, error) {
 	if p.stopped.Load() {
-		return false, nil
+		return false, 0, nil
 	}
 
-	// Fetch the next batch of subscribers from a 'running' campaign.
-	subs, err := p.m.store.NextSubscribers(p.camp.ID, p.lastFetched, p.m.cfg.BatchSize)
-	if err != nil {
-		return false, fmt.Errorf("error fetching campaign subscribers (%s): %v", p.camp.Name, err)
-	}
+	// Subscribers held back by the relay's cadence go first.
+	subs := p.backlog
+	p.backlog = nil
 
-	// There are no subscribers from the query. Either all subscribers on the campaign
-	// have been processed, or the campaign has changed from 'running' to 'paused' or 'cancelled'.
 	if len(subs) == 0 {
-		return false, nil
+		// Fetch the next batch of subscribers from a 'running' campaign.
+		var err error
+		subs, err = p.m.store.NextSubscribers(p.camp.ID, p.lastFetched, p.m.cfg.BatchSize)
+		if err != nil {
+			return false, 0, fmt.Errorf("error fetching campaign subscribers (%s): %v", p.camp.Name, err)
+		}
+
+		// There are no subscribers from the query. Either all subscribers on the campaign
+		// have been processed, or the campaign has changed from 'running' to 'paused' or 'cancelled'.
+		if len(subs) == 0 {
+			return false, 0, nil
+		}
+
+		// Record all fetched subs before queueing for messaging.
+		p.pendingMut.Lock()
+		p.lastFetched = subs[len(subs)-1].ID
+		for _, s := range subs {
+			p.pending[s.ID] = struct{}{}
+		}
+		p.pendingMut.Unlock()
 	}
 
-	// Record all fetched subs before queueing for messaging.
-	p.pendingMut.Lock()
-	p.lastFetched = subs[len(subs)-1].ID
-	for _, s := range subs {
-		p.pending[s.ID] = struct{}{}
-	}
-	p.pendingMut.Unlock()
+	relay := p.m.relay(p.camp.Messenger)
 
 	// Is there a sliding window limit configured?
 	hasSliding := p.m.cfg.SlidingWindow &&
@@ -123,9 +142,17 @@ func (p *pipe) NextSubscribers() (bool, error) {
 		p.m.cfg.SlidingWindowDuration.Seconds() > 1
 
 	// Push messages.
-	for _, s := range subs {
+	for i, s := range subs {
 		if p.stopped.Load() {
-			return false, nil
+			return false, 0, nil
+		}
+
+		// Wait for the relay's cadence (rates, sending hours, warm-up).
+		if relay != nil {
+			if ok, wait := relay.reserve(time.Now()); !ok {
+				p.backlog = subs[i:]
+				return true, wait, nil
+			}
 		}
 
 		msg, err := p.newMessage(s)
@@ -137,6 +164,7 @@ func (p *pipe) NextSubscribers() (bool, error) {
 
 		// Push the message to the queue while blocking and waiting until
 		// the queue is drained.
+		p.m.inFlight.Add(1)
 		p.m.campMsgQ <- msg
 
 		// Check if the sliding window is active.
@@ -166,7 +194,7 @@ func (p *pipe) NextSubscribers() (bool, error) {
 		}
 	}
 
-	return true, nil
+	return true, 0, nil
 }
 
 // OnError keeps track of the number of errors that occur while sending messages

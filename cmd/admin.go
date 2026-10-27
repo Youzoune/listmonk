@@ -125,6 +125,15 @@ func (a *App) GetServerConfig(c *echo.Context) error {
 			fmt.Sprintf("Error loading server config: %v", err))
 	}
 
+	// Only the relays the current project may use.
+	msgrs := make([]string, 0, len(out.Messengers))
+	for _, m := range out.Messengers {
+		if a.relayAllowed(m, projectID(c)) {
+			msgrs = append(msgrs, m)
+		}
+	}
+	out.Messengers = msgrs
+
 	return c.JSON(http.StatusOK, okResp{out})
 }
 

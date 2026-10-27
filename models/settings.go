@@ -19,6 +19,7 @@ type Settings struct {
 	AppFaviconURL                 string   `json:"app.favicon_url"`
 	AppFromEmail                  []string `json:"app.from_email"`
 	AppNotifyEmails               []string `json:"app.notify_emails"`
+	AppSystemMessenger            string   `json:"app.system_messenger"`
 	EnablePublicSubPage           bool     `json:"app.enable_public_subscription_page"`
 	EnablePublicArchive           bool     `json:"app.enable_public_archive"`
 	EnablePublicArchiveRSSContent bool     `json:"app.enable_public_archive_rss_content"`
@@ -94,27 +95,7 @@ type Settings struct {
 	UploadS3BucketType         string   `json:"upload.s3.bucket_type"`
 	UploadS3Expiry             string   `json:"upload.s3.expiry"`
 
-	SMTP []struct {
-		Name               string              `json:"name"`
-		UUID               string              `json:"uuid"`
-		Enabled            bool                `json:"enabled"`
-		Host               string              `json:"host"`
-		HelloHostname      string              `json:"hello_hostname"`
-		Port               int                 `json:"port"`
-		AuthProtocol       string              `json:"auth_protocol"`
-		Username           string              `json:"username"`
-		Password           string              `json:"password,omitempty"`
-		EmailHeaders       []map[string]string `json:"email_headers"`
-		MaxConns           int                 `json:"max_conns"`
-		MaxMsgRetries      int                 `json:"max_msg_retries"`
-		MsgRetryDelay      string              `json:"msg_retry_delay"`
-		IdleTimeout        string              `json:"idle_timeout"`
-		WaitTimeout        string              `json:"wait_timeout"`
-		TLSType            string              `json:"tls_type"`
-		TLSSkipVerify      bool                `json:"tls_skip_verify"`
-		FromAddresses      []string            `json:"from_addresses"`
-		ExcludeFromDefault bool                `json:"exclude_from_default"`
-	} `json:"smtp"`
+	SMTP []SMTPServer `json:"smtp"`
 
 	Messengers []struct {
 		UUID          string `json:"uuid"`
@@ -179,4 +160,61 @@ type Settings struct {
 	AdminCustomJS   string `json:"appearance.admin.custom_js"`
 	PublicCustomCSS string `json:"appearance.public.custom_css"`
 	PublicCustomJS  string `json:"appearance.public.custom_js"`
+}
+
+// RelayCadence limits how fast and when a relay (SMTP server) sends. Zero values mean no limit.
+type RelayCadence struct {
+	PerMinute int `json:"per_minute"`
+	PerHour   int `json:"per_hour"`
+	PerDay    int `json:"per_day"`
+
+	// Weekdays the relay sends on (0 = Sunday). Empty means every day.
+	Days []int `json:"days"`
+
+	// Sending hours [from_hour, to_hour) in Timezone. 0 and 0 mean all day.
+	FromHour int    `json:"from_hour"`
+	ToHour   int    `json:"to_hour"`
+	Timezone string `json:"timezone"`
+}
+
+// RelayWarmup ramps a relay's daily volume up from its first sending day.
+type RelayWarmup struct {
+	Enabled bool    `json:"enabled"`
+	Start   int     `json:"start"`
+	Growth  float64 `json:"growth"`
+	Cap     int     `json:"cap"`
+
+	// First sending day, YYYY-MM-DD in the cadence's timezone.
+	Since string `json:"since"`
+}
+
+// DefaultRelayTimezone is used when a relay's cadence has no timezone.
+const DefaultRelayTimezone = "Europe/Paris"
+
+// SMTPServer is an SMTP server (relay) in the settings.
+type SMTPServer struct {
+	Name               string              `json:"name"`
+	UUID               string              `json:"uuid"`
+	Enabled            bool                `json:"enabled"`
+	Host               string              `json:"host"`
+	HelloHostname      string              `json:"hello_hostname"`
+	Port               int                 `json:"port"`
+	AuthProtocol       string              `json:"auth_protocol"`
+	Username           string              `json:"username"`
+	Password           string              `json:"password,omitempty"`
+	EmailHeaders       []map[string]string `json:"email_headers"`
+	MaxConns           int                 `json:"max_conns"`
+	MaxMsgRetries      int                 `json:"max_msg_retries"`
+	MsgRetryDelay      string              `json:"msg_retry_delay"`
+	IdleTimeout        string              `json:"idle_timeout"`
+	WaitTimeout        string              `json:"wait_timeout"`
+	TLSType            string              `json:"tls_type"`
+	TLSSkipVerify      bool                `json:"tls_skip_verify"`
+	FromAddresses      []string            `json:"from_addresses"`
+	ExcludeFromDefault bool                `json:"exclude_from_default"`
+
+	// Project the relay belongs to; 0 shares it with every project.
+	ProjectID int          `json:"project_id"`
+	Cadence   RelayCadence `json:"cadence"`
+	Warmup    RelayWarmup  `json:"warmup"`
 }

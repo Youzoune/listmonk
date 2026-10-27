@@ -180,7 +180,8 @@ func (a *App) UpdateSettings(c *echo.Context) error {
 	// There should be at least one enabled SMTP server for the default messenger.
 	has := false
 	for i, s := range set.SMTP {
-		if s.Enabled && !s.ExcludeFromDefault {
+		// Relays of a project are never in the default pool, which is shared by every project.
+		if s.Enabled && !s.ExcludeFromDefault && s.ProjectID == 0 {
 			has = true
 		}
 
@@ -215,6 +216,14 @@ func (a *App) UpdateSettings(c *echo.Context) error {
 		// This is a common mistake when copy-pasting SMTP settings.
 		set.SMTP[i].Host = strings.TrimSpace(s.Host)
 
+		// Cadence and warm-up.
+		if err := a.validateRelayCadence(s.Cadence, s.Warmup); err != nil {
+			return err
+		}
+		if s.ProjectID != 0 && name == "" {
+			return echo.NewHTTPError(http.StatusBadRequest, a.i18n.T("relays.projectNameRequired"))
+		}
+
 		// If there's no password coming in from the frontend, copy the existing
 		// password by matching the UUID.
 		if s.Password == "" {
@@ -227,6 +236,19 @@ func (a *App) UpdateSettings(c *echo.Context) error {
 	}
 	if !has {
 		return echo.NewHTTPError(http.StatusBadRequest, a.i18n.T("settings.smtp.defaultRequired"))
+	}
+
+	// The system relay is the default pool or a named, enabled, shared SMTP.
+	if m := set.AppSystemMessenger; m != "" && m != email.MessengerName {
+		ok := false
+		for _, s := range set.SMTP {
+			if s.Name == m && s.Enabled && s.ProjectID == 0 {
+				ok = true
+			}
+		}
+		if !ok {
+			return echo.NewHTTPError(http.StatusBadRequest, a.i18n.Ts("relays.invalidSystemRelay", "name", m))
+		}
 	}
 
 	// Normalize `from_addresses``. Values are either an e-mail address
@@ -444,8 +466,9 @@ func (a *App) validateOIDCSettings(set models.Settings) error {
 // immediate app restart or marks the app as needing a restart.
 func (a *App) handleSettingsRestart(c *echo.Context) error {
 	// If there are any active campaigns, don't do an auto reload and
-	// warn the user on the frontend.
-	if a.manager.HasRunningCampaigns() {
+	// warn the user on the frontend. Campaigns that are only waiting for
+	// their relay's cadence don't block it: their progress is saved on close.
+	if a.manager.HasRunningCampaigns() && !a.manager.IdleForRestart() {
 		a.Lock()
 		a.needsRestart = true
 		a.Unlock()

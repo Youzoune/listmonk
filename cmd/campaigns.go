@@ -814,6 +814,9 @@ func (a *App) TestCampaign(c *echo.Context) error {
 	camp.FromEmail = req.FromEmail
 	camp.Body = req.Body
 	camp.AltBody = req.AltBody
+	if err := a.checkRelay(c, req.Messenger); err != nil {
+		return err
+	}
 	camp.Messenger = req.Messenger
 	camp.ContentType = req.ContentType
 	camp.Headers = req.Headers
@@ -1037,11 +1040,16 @@ func canEditCampaign(status string) bool {
 		status == models.CampaignStatusScheduled
 }
 
-// checkCampaignRefs checks that the lists, media and templates a campaign
-// refers to belong to the request's project.
+// checkCampaignRefs checks that the lists, media, templates and relay a
+// campaign refers to belong to the request's project.
 func (a *App) checkCampaignRefs(c *echo.Context, o campReq) error {
 	if err := a.requireOwned(c, core.EntityList, o.ListIDs...); err != nil {
 		return err
+	}
+	if o.Messenger != "" {
+		if err := a.checkRelay(c, o.Messenger); err != nil {
+			return err
+		}
 	}
 	if err := a.requireOwned(c, core.EntityMedia, o.MediaIDs...); err != nil {
 		return err

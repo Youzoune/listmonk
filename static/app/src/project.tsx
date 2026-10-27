@@ -40,9 +40,15 @@ function readStored(): number | null {
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
-  const { data: profile } = useProfile();
+  const profileQ = useProfile();
+  const profile = profileQ.data;
   const canList = hasPerm(profile, 'projects:get', 'projects:manage');
-  const { data } = useProjects(canList);
+  const projectsQ = useProjects(canList);
+  const data = projectsQ.data;
+  // Nothing renders (and no request goes out) before the current project is
+  // known: requests sent on the default project meanwhile would be cached
+  // under the wrong project.
+  const ready = profileQ.isSuccess && (!canList || projectsQ.isSuccess || projectsQ.isError);
   const projects = useMemo(() => (canList && data?.length ? data : [DEFAULT_PROJECT]), [canList, data]);
   const [selected, setSelected] = useState<number | null>(readStored);
 
@@ -50,12 +56,13 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   setCurrentProject(project.id);
 
   useEffect(() => {
+    if (!ready) return;
     try {
       localStorage.setItem(STORAGE_KEY, String(project.id));
     } catch {
       /* storage unavailable: the choice lasts for this tab only */
     }
-  }, [project.id]);
+  }, [project.id, ready]);
 
   const value = useMemo<Ctx>(() => ({
     profile,
@@ -68,6 +75,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     },
     can: (...perms) => hasPerm(profile, ...perms),
   }), [profile, projects, project, qc]);
+
+  if (!ready) {
+    return <p className="boot" role="status">Chargement de Relais…</p>;
+  }
 
   return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;
 }

@@ -25,7 +25,7 @@ export function senderName(from: string) {
 
 // listmonk names the default messenger "email" and each named SMTP after its name.
 export function relayLabel(messenger: string) {
-  return messenger === 'email' ? 'Relais par défaut' : messenger;
+  return messenger === 'email' ? 'Relais par défaut' : messenger.replace(/^email-/, '');
 }
 
 export function initials(name: string) {

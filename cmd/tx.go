@@ -71,8 +71,11 @@ func (a *App) SendTxMessage(c *echo.Context) error {
 		m = r
 	}
 
-	// The template and the subscribers must belong to the request's project.
+	// The template, the subscribers and the relay must belong to the request's project.
 	if err := a.requireOwned(c, core.EntityTemplate, m.TemplateID); err != nil {
+		return err
+	}
+	if err := a.checkRelay(c, m.Messenger); err != nil {
 		return err
 	}
 	if err := a.requireOwned(c, core.EntitySubscriber, m.SubscriberIDs...); err != nil {

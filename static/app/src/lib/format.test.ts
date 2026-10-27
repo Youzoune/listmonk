@@ -16,6 +16,7 @@ describe('format', () => {
   it('names relays the way people read them', () => {
     expect(relayLabel('email')).toBe('Relais par défaut');
     expect(relayLabel('sport-ses')).toBe('sport-ses');
+    expect(relayLabel('email-sport-ses')).toBe('sport-ses');
   });
 
   it('agrees counts in French', () => {
