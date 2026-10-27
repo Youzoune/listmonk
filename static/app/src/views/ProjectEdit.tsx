@@ -1,16 +1,18 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
-import { useDeleteProject, useSaveProject, useSetUserProjects, useUsers, useUsersProjects } from '../api/hooks';
+import { useDeleteProject, useSaveProject, useServerConfig, useSetUserProjects, useUsers, useUsersProjects } from '../api/hooks';
 import type { Project, User } from '../api/types';
-import { Chip, ErrorState, Field, Icon, Loading, ProjectBadge } from '../components/ui';
+import { Chip, ErrorState, Explain, Field, Icon, Loading, ProjectBadge } from '../components/ui';
 import { count } from '../lib/format';
-import { hasAllProjects, isValidDomain, isValidSlug, slugify, toggleId } from '../lib/projects';
+import { hasAllProjects, isUnderBase, isValidDomain, isValidSlug, projectSubdomain, publicURLs, rootHost, slugify, toggleId } from '../lib/projects';
 import { useProject } from '../project';
 
 const DEFAULT_PROJECT_ID = 1;
 
 function ProjectForm({ project, onSaved }: { project?: Project; onSaved: (p: Project) => void }) {
   const save = useSaveProject();
+  const { project: current } = useProject();
+  const base = useServerConfig(current.id).data?.projects_domain;
   const [name, setName] = useState(project?.name ?? '');
   const [slug, setSlug] = useState(project?.slug ?? '');
   // The slug follows the name until someone edits it by hand.
@@ -23,7 +25,8 @@ function ProjectForm({ project, onSaved }: { project?: Project; onSaved: (p: Pro
   const errors = {
     name: name.trim() === '' ? 'Donnez un nom au projet.' : '',
     slug: !isValidSlug(shownSlug) ? 'Minuscules, chiffres et tirets, 64 caractères au plus.' : '',
-    domain: !isValidDomain(domain) ? 'Un nom d’hôte comme newsletter.exemple.fr, sans http://.' : '',
+    domain: !isValidDomain(domain) ? 'Un nom d’hôte comme newsletter.exemple.fr, sans http://.'
+      : isUnderBase(domain, base) ? `Les sous-domaines de ${base} sont donnés automatiquement : laissez vide, ou choisissez un domaine hors de ${base}.` : '',
   };
   const invalid = Object.values(errors).some(Boolean);
 
@@ -48,13 +51,17 @@ function ProjectForm({ project, onSaved }: { project?: Project; onSaved: (p: Pro
       </Field>
       {submitted && errors.name && <p className="field-error">{errors.name}</p>}
 
-      <Field id="p-slug" label="Identifiant" hint="Utilisé dans l’en-tête X-Listmonk-Project des intégrations. Le changer casse les intégrations qui l’utilisent.">
+      <Field id="p-slug" label="Identifiant" hint={base && project?.id !== DEFAULT_PROJECT_ID
+        ? `Donne l’adresse du projet (${projectSubdomain({ id: project?.id ?? 0, slug: shownSlug || 'identifiant' }, base)}) et sert aux intégrations. Le changer change l’adresse : les liens des e-mails déjà envoyés ne marcheront plus.`
+        : 'Utilisé dans l’en-tête X-Listmonk-Project des intégrations. Le changer casse les intégrations qui l’utilisent.'}>
         <input id="p-slug" type="text" className="mono" value={shownSlug}
           onChange={(e) => { setSlugTouched(true); setSlug(e.target.value.toLowerCase()); }} aria-invalid={submitted && !!errors.slug} />
       </Field>
       {submitted && errors.slug && <p className="field-error">{errors.slug}</p>}
 
-      <Field id="p-domain" label="Domaine (facultatif)" hint="Le domaine des pages publiques du projet : inscription, préférences, désinscription.">
+      <Field id="p-domain" label={base ? 'Domaine personnalisé (facultatif)' : 'Domaine (facultatif)'} hint={base
+        ? 'Pour des pages à l’adresse du client (newsletter.client.fr) au lieu du sous-domaine automatique.'
+        : 'Le domaine des pages publiques du projet (inscription, préférences, désinscription, archive) et des liens de ses e-mails.'}>
         <input id="p-domain" type="text" className="mono" value={domain} onChange={(e) => setDomain(e.target.value)}
           placeholder="newsletter.exemple.fr" aria-invalid={submitted && !!errors.domain} />
       </Field>
@@ -74,6 +81,62 @@ function ProjectForm({ project, onSaved }: { project?: Project; onSaved: (p: Pro
         </button>
       </div>
     </form>
+  );
+}
+
+function PublicPages({ project }: { project: Project }) {
+  const { project: current } = useProject();
+  const config = useServerConfig(current.id);
+  if (!config.data) return null;
+
+  const base = config.data.projects_domain;
+  const urls = publicURLs(project, config.data.root_url, base);
+  const sub = projectSubdomain(project, base);
+  const links: [string, string][] = [
+    ['Formulaire d’inscription', urls.form],
+    ['Archive des campagnes', urls.archive],
+    ['Flux RSS de l’archive', urls.feed],
+  ];
+
+  return (
+    <section className="panel public-pages">
+      <h2>Pages publiques</h2>
+      <p className="small">
+        {urls.kind === 'instance'
+          ? <>Les pages publiques de « {project.name} » utilisent l’adresse principale de Relais.</>
+          : <>Les pages publiques de « {project.name} » sont servies sur <span className="mono strong">{urls.host}</span>, à son nom. Les liens de ses e-mails (désinscription, préférences, lecture en ligne, suivi des clics) pointent aussi vers cette adresse.</>}
+      </p>
+      <dl className="url-list">
+        {links.map(([label, url]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd><a className="link mono" href={url} target="_blank" rel="noreferrer">{url}</a></dd>
+          </div>
+        ))}
+      </dl>
+      <p className="small muted">
+        Un contact qui se désinscrit ne quitte que les listes de ce projet. Inscrit avec la même adresse dans un autre projet, il y reste.
+      </p>
+      {urls.kind === 'subdomain' && (
+        <p className="small muted">Rien à brancher : comme les espaces de Twenty, chaque projet a son sous-domaine dès sa création.</p>
+      )}
+      {urls.kind === 'custom' && (
+        <Explain title="Brancher le domaine personnalisé">
+          <ol className="steps-list">
+            <li>Chez le gestionnaire du domaine (OVHcloud, Gandi, Cloudflare…), créez un enregistrement <span className="strong">CNAME</span> : <span className="mono">{urls.host}</span> → <span className="mono">{sub || rootHost(config.data.root_url) || 'l’adresse de Relais'}</span>.</li>
+            <li>Le certificat HTTPS est demandé automatiquement à la première visite si le serveur utilise les certificats à la demande (voir la documentation). Sinon, ajoutez le domaine au proxy.</li>
+            <li>Ouvrez le formulaire d’inscription ci-dessus : il doit s’afficher avec le nom du projet.</li>
+          </ol>
+          <p>Tant que le domaine n’est pas branché, les liens des e-mails de ce projet ne fonctionnent pas : branchez-le avant d’envoyer une campagne.</p>
+        </Explain>
+      )}
+      {urls.kind === 'instance' && project.id !== DEFAULT_PROJECT_ID && (
+        <p className="small muted">
+          Pour donner à chaque projet son sous-domaine, comme les espaces de Twenty, l’administrateur du serveur règle une fois le domaine de base
+          (<span className="mono">LISTMONK_projects__domain</span>).
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -220,6 +283,7 @@ export function ProjectEdit() {
         <div className="grid-2 align-start">
           <ProjectForm key={project.id} project={project} onSaved={() => undefined} />
           <div className="stack">
+            <PublicPages project={project} />
             <Access project={project} />
             <DangerZone project={project} />
           </div>

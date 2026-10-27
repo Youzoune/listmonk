@@ -123,6 +123,7 @@ func (a *App) CreateProject(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
+	a.refreshProjects()
 
 	return c.JSON(http.StatusOK, okResp{out})
 }
@@ -143,6 +144,7 @@ func (a *App) UpdateProject(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
+	a.refreshProjects()
 
 	return c.JSON(http.StatusOK, okResp{out})
 }
@@ -152,6 +154,7 @@ func (a *App) DeleteProject(c *echo.Context) error {
 	if err := a.core.DeleteProject(getID(c)); err != nil {
 		return err
 	}
+	a.refreshProjects()
 
 	return c.JSON(http.StatusOK, okResp{true})
 }
@@ -224,6 +227,10 @@ func (a *App) validateProject(p models.Project) (models.Project, error) {
 	}
 	if p.Domain.Valid && (len(p.Domain.String) > 253 || !regexpProjectDomain.MatchString(p.Domain.String)) {
 		return p, echo.NewHTTPError(http.StatusBadRequest, a.i18n.T("projects.invalidDomain"))
+	}
+	// Subdomains of the projects' base domain are given automatically.
+	if base := a.projects.BaseDomain(); base != "" && p.Domain.Valid && (p.Domain.String == base || strings.HasSuffix(p.Domain.String, "."+base)) {
+		return p, echo.NewHTTPError(http.StatusBadRequest, a.i18n.Ts("projects.domainUnderBase", "domain", base))
 	}
 	if !strHasLen(p.Description, 0, stdInputMaxLen) {
 		return p, echo.NewHTTPError(http.StatusBadRequest,

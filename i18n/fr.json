@@ -422,6 +422,7 @@
     "menu.allSubscribers": "Tou·tes les abonné·es",
     "projects.cantDeleteDefault": "Le projet par défaut ne peut pas être supprimé.",
     "projects.domainExists": "Un autre projet utilise déjà ce domaine.",
+    "projects.domainUnderBase": "Les projets ont automatiquement un sous-domaine de {domain}. Laissez le domaine vide, ou utilisez-en un hors de {domain}.",
     "projects.invalidDomain": "Domaine invalide. Utilisez un nom d'hôte comme newsletter.exemple.com.",
     "projects.invalidSlug": "Identifiant invalide. Utilisez des minuscules, des chiffres et des tirets (64 caractères max.).",
     "projects.listsAcrossProjects": "Les listes doivent toutes appartenir au même projet.",

@@ -322,6 +322,7 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 		g.GET("/api/public/lists", a.GetPublicLists)
 		g.POST("/api/public/subscription", a.PublicSubscription)
 		g.GET("/api/public/captcha/altcha", a.AltchaChallenge)
+		g.GET("/api/public/domains/check", a.CheckPublicDomain)
 		if a.cfg.EnablePublicArchive {
 			g.GET("/api/public/archive", a.GetCampaignArchives)
 		}
@@ -447,7 +448,8 @@ func (a *App) hasSub(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		subUUID := c.Param("subUUID")
 
-		if _, err := a.core.GetSubscriber(0, subUUID, "", 0); err != nil {
+		sub, err := a.core.GetSubscriber(0, subUUID, "", 0)
+		if err != nil {
 			if er, ok := err.(*echo.HTTPError); ok && er.Code == http.StatusBadRequest {
 				return c.Render(http.StatusNotFound, tplMessage,
 					makeMsgTpl(a.i18n.T("globals.terms.notFound"), "", er.Message))
@@ -457,6 +459,12 @@ func (a *App) hasSub(next echo.HandlerFunc) echo.HandlerFunc {
 			return c.Render(http.StatusInternalServerError, tplMessage,
 				makeMsgTpl(a.i18n.T("globals.terms.error"), "", a.i18n.T("public.errorProcessingRequest")))
 		}
+
+		// A project's domain only serves its own subscribers.
+		if !a.onHostProject(c, sub.ProjectID) {
+			return a.notFoundPage(c, a.i18n.T("public.errorFetchingEmail"))
+		}
+		c.Set(publicProjectCtxKey, sub.ProjectID)
 
 		return next(c)
 	}

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"html/template"
 	"net/http"
-	"net/url"
 
 	"github.com/gorilla/feeds"
 	"github.com/knadh/listmonk/internal/manager"
@@ -27,7 +26,7 @@ type campArchive struct {
 func (a *App) GetCampaignArchives(c *echo.Context) error {
 	// Get archives from the DB.
 	pg := a.pg.NewFromURL(c.Request().URL.Query())
-	camps, total, err := a.getCampaignArchives(pg.Offset, pg.Limit, false)
+	camps, total, err := a.getCampaignArchives(a.publicProjectID(c), pg.Offset, pg.Limit, false)
 	if err != nil {
 		return err
 	}
@@ -59,7 +58,7 @@ func (a *App) GetCampaignArchivesFeed(c *echo.Context) error {
 	)
 
 	// Get archives from the DB.
-	camps, _, err := a.getCampaignArchives(pg.Offset, pg.Limit, showFullContent)
+	camps, _, err := a.getCampaignArchives(a.publicProjectID(c), pg.Offset, pg.Limit, showFullContent)
 	if err != nil {
 		return err
 	}
@@ -82,9 +81,14 @@ func (a *App) GetCampaignArchivesFeed(c *echo.Context) error {
 	}
 
 	// Generate the feed.
+	projectID := a.publicProjectID(c)
+	title := a.cfg.SiteName
+	if p, ok := a.projects.Get(projectID); ok && projectID != models.DefaultProjectID {
+		title = p.Name
+	}
 	feed := &feeds.Feed{
-		Title:       a.cfg.SiteName,
-		Link:        &feeds.Link{Href: a.urlCfg.RootURL},
+		Title:       title,
+		Link:        &feeds.Link{Href: a.projects.RootURL(projectID)},
 		Description: a.i18n.T("public.archiveTitle"),
 		Items:       out,
 	}
@@ -101,11 +105,12 @@ func (a *App) GetCampaignArchivesFeed(c *echo.Context) error {
 func (a *App) CampaignArchivesPage(c *echo.Context) error {
 	// Get archives from the DB.
 	pg := a.pg.NewFromURL(c.Request().URL.Query())
-	out, total, err := a.getCampaignArchives(pg.Offset, pg.Limit, false)
+	out, total, err := a.getCampaignArchives(a.publicProjectID(c), pg.Offset, pg.Limit, false)
 	if err != nil {
 		return err
 	}
 	pg.SetTotal(total)
+	c.Set(publicProjectCtxKey, a.publicProjectID(c))
 
 	title := a.i18n.T("public.archiveTitle")
 	return c.Render(http.StatusOK, "archive", struct {
@@ -156,6 +161,11 @@ func (a *App) CampaignArchivePage(c *echo.Context) error {
 			makeMsgTpl(a.i18n.T("globals.terms.error"), "", a.i18n.Ts("public.errorFetchingCampaign")))
 	}
 
+	// A project's domain only shows that project's campaigns.
+	if !a.onHostProject(c, pubCamp.ProjectID) {
+		return a.notFoundPage(c, a.i18n.T("public.campaignNotFound"))
+	}
+
 	// "Compile" the campaign template with appropriate data.
 	out, err := a.compileArchiveCampaigns([]models.Campaign{pubCamp})
 	if err != nil {
@@ -178,7 +188,7 @@ func (a *App) CampaignArchivePage(c *echo.Context) error {
 // CampaignArchivePageLatest renders the latest public campaign.
 func (a *App) CampaignArchivePageLatest(c *echo.Context) error {
 	// Get the latest campaign from the DB.
-	camps, _, err := a.getCampaignArchives(0, 1, true)
+	camps, _, err := a.getCampaignArchives(a.publicProjectID(c), 0, 1, true)
 	if err != nil {
 		return err
 	}
@@ -193,8 +203,8 @@ func (a *App) CampaignArchivePageLatest(c *echo.Context) error {
 }
 
 // getCampaignArchives fetches the public campaign archives from the DB.
-func (a *App) getCampaignArchives(offset, limit int, renderBody bool) ([]campArchive, int, error) {
-	pubCamps, total, err := a.core.GetArchivedCampaigns(offset, limit, models.DefaultProjectID)
+func (a *App) getCampaignArchives(projectID, offset, limit int, renderBody bool) ([]campArchive, int, error) {
+	pubCamps, total, err := a.core.GetArchivedCampaigns(offset, limit, projectID)
 	if err != nil {
 		return []campArchive{}, total, echo.NewHTTPError(http.StatusInternalServerError, a.i18n.T("public.errorFetchingCampaign"))
 	}
@@ -215,12 +225,8 @@ func (a *App) getCampaignArchives(offset, limit int, renderBody bool) ([]campArc
 			SendAt:    camp.SendAt,
 		}
 
-		// The campaign may have a custom slug.
-		if camp.ArchiveSlug.Valid {
-			archive.URL, _ = url.JoinPath(a.urlCfg.ArchiveURL, camp.ArchiveSlug.String)
-		} else {
-			archive.URL, _ = url.JoinPath(a.urlCfg.ArchiveURL, camp.UUID)
-		}
+		// On the domain of the campaign's project, by its slug or UUID.
+		archive.URL = a.projects.ArchiveCampaignURL(*camp)
 
 		// Render the full template body if requested.
 		if renderBody {

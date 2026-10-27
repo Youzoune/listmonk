@@ -26,6 +26,7 @@ import (
 	"github.com/knadh/listmonk/internal/manager"
 	"github.com/knadh/listmonk/internal/media"
 	"github.com/knadh/listmonk/internal/messenger/email"
+	"github.com/knadh/listmonk/internal/projectdir"
 	"github.com/knadh/listmonk/internal/subimporter"
 	"github.com/knadh/listmonk/models"
 	"github.com/knadh/paginator/v2"
@@ -41,6 +42,7 @@ type App struct {
 	queries    *models.Queries
 	core       *core.Core
 	manager    *manager.Manager
+	projects   *projectdir.Dir
 	messengers []manager.Messenger
 	emailMsgr  manager.Messenger
 	importer   *subimporter.Importer
@@ -213,7 +215,10 @@ func main() {
 		// Initialize the media store.
 		media = initMediaStore(ko)
 
-		fbOptinNotify = makeOptinNotifyHook(ko.Bool("privacy.unsubscribe_header"), urlCfg, queries, i18n)
+		// Projects, for their public pages and the links in their e-mails.
+		projects = projectdir.New(urlCfg.RootURL, urlCfg.RootPath, ko.String("projects.domain"))
+
+		fbOptinNotify = makeOptinNotifyHook(ko.Bool("privacy.unsubscribe_header"), urlCfg, projects, queries, i18n)
 
 		// Crud core.
 		core = initCore(fbOptinNotify, queries, db, i18n, ko)
@@ -237,6 +242,12 @@ func main() {
 
 		chReload = make(chan os.Signal, 1)
 	)
+
+	// Links in e-mails point at the domain of the campaign's project.
+	if err := loadProjects(projects, core); err != nil {
+		lo.Printf("error loading projects: %v", err)
+	}
+	mgr.SetProjectURLs(projects.ManagerURLs())
 
 	// Initialize the bounce manager that processes bounces from webhooks and
 	// POP3 mailbox scanning.
@@ -296,6 +307,7 @@ func main() {
 		queries:    queries,
 		core:       core,
 		manager:    mgr,
+		projects:   projects,
 		messengers: msgrs,
 		emailMsgr:  emailMsgr,
 		importer:   importer,

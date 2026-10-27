@@ -7,7 +7,9 @@ const MAILHOG_URL = process.env.MAILHOG_URL || 'http://localhost:8025';
 const ROOT = '..';
 const CONFIG = process.env.LISTMONK_CONFIG || process.env.DEV_CONFIG || 'config.toml';
 const AUTH_FILE = new URL('.auth/admin.json', import.meta.url).pathname;
-const ENV = { ...process.env, LISTMONK_ADMIN_USER: 'admin', LISTMONK_ADMIN_PASSWORD: 'listmonk' };
+// Projects get <slug>.relais.localhost, which Chromium resolves to this machine.
+export const PROJECTS_DOMAIN = process.env.LISTMONK_projects__domain || 'relais.localhost';
+const ENV = { ...process.env, LISTMONK_ADMIN_USER: 'admin', LISTMONK_ADMIN_PASSWORD: 'listmonk', LISTMONK_projects__domain: PROJECTS_DOMAIN };
 
 // A single SMTP server pointing at MailHog so tests capture (and can assert on) mail.
 const MAILHOG_SMTP = JSON.stringify([{

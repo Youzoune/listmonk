@@ -422,6 +422,7 @@
     "menu.allSubscribers": "All subscribers",
     "projects.cantDeleteDefault": "The default project can't be deleted.",
     "projects.domainExists": "Another project already uses this domain.",
+    "projects.domainUnderBase": "Projects get a subdomain of {domain} automatically. Leave the domain empty, or use one outside {domain}.",
     "projects.invalidDomain": "Invalid domain. Use a hostname such as newsletter.example.com.",
     "projects.invalidSlug": "Invalid slug. Use lowercase letters, digits and dashes (max. 64 characters).",
     "projects.listsAcrossProjects": "Lists must all belong to the same project.",

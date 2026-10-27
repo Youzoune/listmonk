@@ -106,7 +106,7 @@ par défaut. Il vérifie l'accès de l'utilisateur et renvoie 403 sinon.
 * Tableau de bord : chiffres et courbes calculés en direct pour le projet courant (les vues matérialisées
   d'upstream restent utilisées pour la vue de toute l'instance).
 * Inscription publique : le projet de l'abonné est celui des listes choisies ; des listes de projets différents
-  sont refusées. Les pages publiques et l'archive n'affichent pour l'instant que le projet par défaut (lot 5).
+  sont refusées. Depuis le lot 5, les pages publiques et l'archive suivent le domaine du projet (voir [pages-publiques.md](pages-publiques.md)).
 * Rebonds reçus par e-mail : on cherche l'abonné dans le projet de la campagne quand elle est connue.
 
 **Limites connues :**

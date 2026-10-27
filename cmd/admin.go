@@ -37,16 +37,20 @@ type serverConfig struct {
 	NeedsRestart  bool            `json:"needs_restart"`
 	HasLegacyUser bool            `json:"has_legacy_user"`
 	Version       string          `json:"version"`
+
+	// Base domain of the projects' subdomains ("" if none).
+	ProjectsDomain string `json:"projects_domain"`
 }
 
 func (a *App) makeServerConfig() (serverConfig, error) {
 	out := serverConfig{
-		RootURL:       a.urlCfg.RootURL,
-		FromEmail:     a.cfg.FromEmail,
-		FromEmails:    a.cfg.FromEmails,
-		Lang:          a.cfg.Lang,
-		Permissions:   a.cfg.PermissionsRaw,
-		HasLegacyUser: a.cfg.HasLegacyUser,
+		RootURL:        a.urlCfg.RootURL,
+		ProjectsDomain: a.projects.BaseDomain(),
+		FromEmail:      a.cfg.FromEmail,
+		FromEmails:     a.cfg.FromEmails,
+		Lang:           a.cfg.Lang,
+		Permissions:    a.cfg.PermissionsRaw,
+		HasLegacyUser:  a.cfg.HasLegacyUser,
 		Privacy: struct {
 			DisableTracking    bool `json:"disable_tracking"`
 			IndividualTracking bool `json:"individual_tracking"`

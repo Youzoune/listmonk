@@ -31,6 +31,8 @@ export interface Profile {
 
 export interface ServerConfig {
   root_url: string;
+  // Base domain of the projects' subdomains, "" if none.
+  projects_domain?: string;
   from_email: string;
   from_emails: string[];
   messengers: string[];

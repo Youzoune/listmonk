@@ -31,7 +31,7 @@ export default defineConfig({
       stderr: 'pipe',
       url: `${BASE_URL}/health`,
       reuseExistingServer: false,
-      env: { LISTMONK_ADMIN_USER: 'admin', LISTMONK_ADMIN_PASSWORD: 'listmonk' },
+      env: { LISTMONK_ADMIN_USER: 'admin', LISTMONK_ADMIN_PASSWORD: 'listmonk', LISTMONK_projects__domain: process.env.LISTMONK_projects__domain || 'relais.localhost' },
     },
   ],
 

@@ -120,6 +120,11 @@ type Manager struct {
 	relays    map[string]*relayLimiter
 	relaysMut sync.RWMutex
 
+	// Public URLs of each project: links in a campaign's e-mails point at the
+	// domain of the campaign's project.
+	projectURLs    map[int]ProjectURLs
+	projectURLsMut sync.RWMutex
+
 	// Campaign messages queued or being sent.
 	inFlight atomic.Int64
 
@@ -223,6 +228,46 @@ func (m *Manager) AddMessenger(msg Messenger) error {
 	m.messengers[id] = msg
 
 	return nil
+}
+
+// ProjectURLs are the public URLs of a project.
+type ProjectURLs struct {
+	Root    string
+	Archive string
+}
+
+// SetProjectURLs sets the public URLs of every project.
+func (m *Manager) SetProjectURLs(urls map[int]ProjectURLs) {
+	m.projectURLsMut.Lock()
+	m.projectURLs = urls
+	m.projectURLsMut.Unlock()
+}
+
+// projectURL moves a URL built on the instance's root URL (one of the
+// m.cfg.*URL formats) onto the root of the given project.
+func (m *Manager) projectURL(projectID int, u string) string {
+	m.projectURLsMut.RLock()
+	p, ok := m.projectURLs[projectID]
+	m.projectURLsMut.RUnlock()
+
+	if !ok || p.Root == "" || p.Root == m.cfg.RootURL || !strings.HasPrefix(u, m.cfg.RootURL) {
+		return u
+	}
+
+	return p.Root + strings.TrimPrefix(u, m.cfg.RootURL)
+}
+
+// projectArchiveURL is the public archive of the given project.
+func (m *Manager) projectArchiveURL(projectID int) string {
+	m.projectURLsMut.RLock()
+	p, ok := m.projectURLs[projectID]
+	m.projectURLsMut.RUnlock()
+
+	if !ok || p.Archive == "" {
+		return m.cfg.ArchiveURL
+	}
+
+	return p.Archive
 }
 
 // SetRelayLimits sets the cadence and warm-up of a messenger. Messengers
@@ -527,7 +572,7 @@ func (m *Manager) TemplateFuncs(c *models.Campaign) template.FuncMap {
 				subUUID = dummyUUID
 			}
 
-			return m.trackLink(url, msg.Campaign.UUID, subUUID)
+			return m.trackLink(url, msg.Campaign.ProjectID, msg.Campaign.UUID, subUUID)
 		},
 		"TrackView": func(msg *CampaignMessage) template.HTML {
 			if m.cfg.DisableTracking {
@@ -542,7 +587,7 @@ func (m *Manager) TemplateFuncs(c *models.Campaign) template.FuncMap {
 			// Use a 1x1 invisible tracking pixel with explicit dimensions and CSS
 			// visibility properties for better anti-spam filter compatibility.
 			return template.HTML(fmt.Sprintf(`<img src="%s" width="1" height="1" style="display:none;max-height:0;max-width:0;opacity:0" alt="">`,
-				fmt.Sprintf(m.cfg.ViewTrackURL, msg.Campaign.UUID, subUUID)))
+				m.projectURL(msg.Campaign.ProjectID, fmt.Sprintf(m.cfg.ViewTrackURL, msg.Campaign.UUID, subUUID))))
 		},
 		"UnsubscribeURL": func(msg *CampaignMessage) string {
 			return msg.unsubURL
@@ -553,16 +598,22 @@ func (m *Manager) TemplateFuncs(c *models.Campaign) template.FuncMap {
 		"OptinURL": func(msg *CampaignMessage) string {
 			// Add list IDs.
 			// TODO: Show private lists list on optin e-mail
-			return fmt.Sprintf(m.cfg.OptinURL, msg.Subscriber.UUID, "")
+			return m.projectURL(msg.Subscriber.ProjectID, fmt.Sprintf(m.cfg.OptinURL, msg.Subscriber.UUID, ""))
 		},
 		"MessageURL": func(msg *CampaignMessage) string {
-			return fmt.Sprintf(m.cfg.MessageURL, c.UUID, msg.Subscriber.UUID)
+			return m.projectURL(msg.Campaign.ProjectID, fmt.Sprintf(m.cfg.MessageURL, c.UUID, msg.Subscriber.UUID))
 		},
 		"ArchiveURL": func() string {
-			return m.cfg.ArchiveURL
+			if c == nil {
+				return m.cfg.ArchiveURL
+			}
+			return m.projectArchiveURL(c.ProjectID)
 		},
 		"RootURL": func() string {
-			return m.cfg.RootURL
+			if c == nil {
+				return m.cfg.RootURL
+			}
+			return m.projectURL(c.ProjectID, m.cfg.RootURL)
 		},
 	}
 
@@ -781,7 +832,7 @@ func (m *Manager) nextCampaigns() ([]*models.Campaign, error) {
 
 // trackLink register a URL and return its UUID to be used in message templates
 // for tracking links.
-func (m *Manager) trackLink(url, campUUID, subUUID string) string {
+func (m *Manager) trackLink(url string, projectID int, campUUID, subUUID string) string {
 	if m.cfg.DisableTracking {
 		return url
 	}
@@ -791,7 +842,7 @@ func (m *Manager) trackLink(url, campUUID, subUUID string) string {
 	m.linksMut.RLock()
 	if uu, ok := m.links[url]; ok {
 		m.linksMut.RUnlock()
-		return fmt.Sprintf(m.cfg.LinkTrackURL, uu, campUUID, subUUID)
+		return m.projectURL(projectID, fmt.Sprintf(m.cfg.LinkTrackURL, uu, campUUID, subUUID))
 	}
 	m.linksMut.RUnlock()
 
@@ -808,7 +859,7 @@ func (m *Manager) trackLink(url, campUUID, subUUID string) string {
 	m.links[url] = uu
 	m.linksMut.Unlock()
 
-	return fmt.Sprintf(m.cfg.LinkTrackURL, uu, campUUID, subUUID)
+	return m.projectURL(projectID, fmt.Sprintf(m.cfg.LinkTrackURL, uu, campUUID, subUUID))
 }
 
 // sendNotif sends a notification to registered admin e-mails.

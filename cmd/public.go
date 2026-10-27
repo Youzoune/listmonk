@@ -144,9 +144,25 @@ var (
 
 // Render executes and renders a template for echo.
 func (t *pubTplRenderer) Render(c *echo.Context, w io.Writer, name string, data any) error {
+	app := c.Get("app").(*App)
+
+	// A project's pages carry its name, and on its own domain, its links and
+	// assets stay on that domain.
+	siteName, rootURL := t.SiteName, t.RootURL
+	projectID, ok := c.Get(publicProjectCtxKey).(int)
+	if hostID, onHost := app.hostProject(c); onHost {
+		projectID, ok = hostID, true
+		rootURL = app.projects.RootURL(hostID)
+	}
+	if ok && projectID != models.DefaultProjectID {
+		if p, found := app.projects.Get(projectID); found {
+			siteName = p.Name
+		}
+	}
+
 	return t.templates.ExecuteTemplate(w, name, tplData{
-		SiteName:            t.SiteName,
-		RootURL:             t.RootURL,
+		SiteName:            siteName,
+		RootURL:             rootURL,
 		LogoURL:             t.LogoURL,
 		FaviconURL:          t.FaviconURL,
 		AssetVersion:        t.AssetVersion,
@@ -155,7 +171,7 @@ func (t *pubTplRenderer) Render(c *echo.Context, w io.Writer, name string, data 
 		EnablePublicArchive: t.EnablePublicArchive,
 		IndividualTracking:  t.IndividualTracking,
 		Data:                data,
-		L:                   c.Get("app").(*App).i18n,
+		L:                   app.i18n,
 	})
 }
 
@@ -206,9 +222,8 @@ func jsonForTpl(v any) template.JS {
 // GetPublicLists returns the list of public lists with minimal fields
 // required to submit a subscription.
 func (a *App) GetPublicLists(c *echo.Context) error {
-	// Public lists of the default project. Per-project public pages come with
-	// project domains (YZN-214, lot 5).
-	lists, err := a.core.GetLists(models.ListTypePublic, models.ListStatusActive, true, nil, models.DefaultProjectID)
+	// Public lists of the project of the domain (or ?project=<slug>).
+	lists, err := a.core.GetLists(models.ListTypePublic, models.ListStatusActive, true, nil, a.publicProjectID(c))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, a.i18n.T("public.errorFetchingLists"))
 	}
@@ -247,6 +262,12 @@ func (a *App) ViewCampaignMessage(c *echo.Context) error {
 			makeMsgTpl(a.i18n.T("globals.terms.error"), "", a.i18n.Ts("public.errorFetchingCampaign")))
 	}
 
+	// A project's domain only shows that project's campaigns.
+	if !a.onHostProject(c, camp.ProjectID) {
+		return a.notFoundPage(c, a.i18n.T("public.campaignNotFound"))
+	}
+	c.Set(publicProjectCtxKey, camp.ProjectID)
+
 	// Get the subscriber.
 	subUUID := c.Param("subUUID")
 	sub, err := a.core.GetSubscriber(0, subUUID, "", 0)
@@ -258,6 +279,9 @@ func (a *App) ViewCampaignMessage(c *echo.Context) error {
 
 		return c.Render(http.StatusInternalServerError, tplMessage,
 			makeMsgTpl(a.i18n.T("globals.terms.error"), "", a.i18n.Ts("public.errorFetchingCampaign")))
+	}
+	if sub.ProjectID != camp.ProjectID && subUUID != dummyUUID {
+		return a.notFoundPage(c, a.i18n.T("public.errorFetchingEmail"))
 	}
 
 	// Resolve data-embed images to media URLs as cid: cannot resolve on a web page.
@@ -514,8 +538,10 @@ func (a *App) SubscriptionFormPage(c *echo.Context) error {
 			makeMsgTpl(a.i18n.T("globals.terms.error"), "", a.i18n.Ts("public.invalidFeature")))
 	}
 
-	// Public lists of the default project (see GetPublicLists).
-	lists, err := a.core.GetLists(models.ListTypePublic, models.ListStatusActive, true, nil, models.DefaultProjectID)
+	// Public lists of the project of the domain (see GetPublicLists).
+	projectID := a.publicProjectID(c)
+	c.Set(publicProjectCtxKey, projectID)
+	lists, err := a.core.GetLists(models.ListTypePublic, models.ListStatusActive, true, nil, projectID)
 	if err != nil {
 		return c.Render(http.StatusInternalServerError, tplMessage,
 			makeMsgTpl(a.i18n.T("globals.terms.error"), "", a.i18n.Ts("public.errorFetchingLists")))
@@ -867,6 +893,11 @@ func (a *App) processSubForm(c *echo.Context) (bool, error) {
 		return false, echo.NewHTTPError(http.StatusBadRequest, a.i18n.T("projects.listsAcrossProjects"))
 	}
 	projectID := projects[0]
+
+	// On a project's domain, only that project's lists can be joined.
+	if !a.onHostProject(c, projectID) {
+		return false, echo.NewHTTPError(http.StatusBadRequest, a.i18n.T("globals.messages.invalidUUID"))
+	}
 
 	// Insert the subscriber into the DB.
 	_, hasOptin, err := a.core.InsertSubscriber(models.Subscriber{

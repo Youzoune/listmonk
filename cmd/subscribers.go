@@ -16,6 +16,7 @@ import (
 	"github.com/knadh/listmonk/internal/core"
 	"github.com/knadh/listmonk/internal/i18n"
 	"github.com/knadh/listmonk/internal/notifs"
+	"github.com/knadh/listmonk/internal/projectdir"
 	"github.com/knadh/listmonk/internal/subimporter"
 	"github.com/knadh/listmonk/models"
 	"github.com/labstack/echo/v5"
@@ -1205,7 +1206,7 @@ func formatSQLExp(q string) string {
 // makeOptinNotifyHook returns an enclosed callback that sends optin confirmation e-mails.
 // This is plugged into the 'core' package to send optin confirmations when a new subscriber is
 // created via `core.CreateSubscriber()`.
-func makeOptinNotifyHook(unsubHeader bool, u *UrlConfig, q *models.Queries, i *i18n.I18n) func(sub models.Subscriber, listIDs []int) (int, error) {
+func makeOptinNotifyHook(unsubHeader bool, u *UrlConfig, projects *projectdir.Dir, q *models.Queries, i *i18n.I18n) func(sub models.Subscriber, listIDs []int) (int, error) {
 	return func(sub models.Subscriber, listIDs []int) (int, error) {
 		// Fetch double opt-in lists from the given list IDs.
 		// Get the list of subscription lists where the subscriber hasn't confirmed.
@@ -1229,8 +1230,9 @@ func makeOptinNotifyHook(unsubHeader bool, u *UrlConfig, q *models.Queries, i *i
 		for _, l := range out.Lists {
 			qListIDs.Add("l", l.UUID)
 		}
-		out.OptinURL = fmt.Sprintf(u.OptinURL, sub.UUID, qListIDs.Encode())
-		out.UnsubURL = fmt.Sprintf(u.UnsubURL, dummyUUID, sub.UUID)
+		// The links point at the domain of the subscriber's project.
+		out.OptinURL = projects.Rebase(sub.ProjectID, fmt.Sprintf(u.OptinURL, sub.UUID, qListIDs.Encode()))
+		out.UnsubURL = projects.Rebase(sub.ProjectID, fmt.Sprintf(u.UnsubURL, dummyUUID, sub.UUID))
 
 		// Unsub headers.
 		hdr := textproto.MIMEHeader{}
@@ -1238,7 +1240,7 @@ func makeOptinNotifyHook(unsubHeader bool, u *UrlConfig, q *models.Queries, i *i
 
 		// Attach List-Unsubscribe headers?
 		if unsubHeader {
-			unsubURL := fmt.Sprintf(u.UnsubURL, dummyUUID, sub.UUID)
+			unsubURL := out.UnsubURL
 			hdr.Set("List-Unsubscribe-Post", "List-Unsubscribe=One-Click")
 			hdr.Set("List-Unsubscribe", `<`+unsubURL+`>`)
 		}

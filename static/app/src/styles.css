@@ -328,6 +328,11 @@ a.btn-dark { color: var(--bg); }
 .preset-card { display: grid; gap: 4px; padding: 12px 14px; border-radius: var(--r-sm); background: var(--brand-soft); }
 .preset-card p { margin: 0; }
 
+.url-list { display: grid; gap: 10px; margin: 0; }
+.url-list dt { font-size: .82rem; color: var(--muted); }
+.url-list dd { margin: 0; overflow-wrap: anywhere; font-size: .88rem; }
+.steps-list { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+
 /* Guide */
 .guide-layout { display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start; }
 .guide-toc { flex: 1 1 220px; display: grid; gap: 12px; position: sticky; top: 24px; }
