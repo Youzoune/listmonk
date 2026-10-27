@@ -12,9 +12,16 @@ export class ApiError extends Error {
 
 let currentProject: number | null = null;
 
-// The project every request is scoped to. Sent as a header on each call.
+export const PROJECT_COOKIE = 'relais_project';
+
+// The project every request is scoped to. Sent as a header on each call, and
+// kept in a cookie so that the legacy admin pages open on the same project.
 export function setCurrentProject(id: number | null) {
   currentProject = id;
+  if (typeof document === 'undefined') return;
+  document.cookie = id === null
+    ? `${PROJECT_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`
+    : `${PROJECT_COOKIE}=${id}; Path=/; Max-Age=31536000; SameSite=Lax`;
 }
 
 export function loginURL(next: string) {
