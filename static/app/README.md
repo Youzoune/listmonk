@@ -47,8 +47,10 @@ cd tests && bun playwright test specs/app.spec.js   # parcours e2e sur /app
 | Réglages : général, SMTP (préréglages OVH, Google, Microsoft, Brevo…), vitesse, confidentialité et domaines, sécurité et OIDC, rebonds (boîte POP3, webhooks des prestataires), médias, autres canaux, apparence, performances | `/reglages` |
 | Maintenance : nettoyage, journal du serveur | `/maintenance` |
 
-* Après connexion on arrive sur `/app`. La page de connexion reste celle du serveur (`/admin/login`) : elle gère déjà
-  la double authentification et OIDC.
+* L'ancienne interface est coupée : chaque page `/admin/...` renvoie vers l'écran Relais correspondant (anciens liens,
+  favoris, e-mails d'alerte compris, voir `internal/appurls`). Seules restent sous `/admin` les pages de connexion
+  (connexion, double authentification, mot de passe oublié, premier compte), au style de Relais.
+* `LISTMONK_relais__legacy_admin=true` remet l'ancienne interface : les tests e2e d'origine en ont besoin, la production non.
+* Mon compte (`/compte`) : nom, e-mail, mot de passe, double authentification, déconnexion.
 * Les mots de passe enregistrés ne repartent jamais vers le navigateur : un champ vide garde le mot de passe existant.
-* Encore seulement dans l'ancienne interface (`/admin`) : les modèles visuels (éditeur par blocs) et le CSS de l'ancienne
-  interface elle-même. Une campagne écrite ailleurs avec une mise en forme que Relais ne sait pas relire s'édite en HTML.
+* Un modèle visuel (éditeur par blocs) se copie en modèle HTML pour être modifié dans Relais.

@@ -1,20 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, NavLink, Outlet } from 'react-router';
+import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { logout } from '../api/hooks';
 import { useProject } from '../project';
 import { Icon, Logo, ProjectBadge, type IconName } from './ui';
 
-const NAV: { to: string; label: string; icon: IconName; perms?: string[] }[] = [
+// `also`: the other screens of the section, which light up its entry.
+const NAV: { to: string; label: string; icon: IconName; perms?: string[]; also?: string[] }[] = [
   { to: '/', label: 'Aujourd’hui', icon: 'home' },
   { to: '/campagnes', label: 'Campagnes', icon: 'send', perms: ['campaigns:get_all', 'campaigns:get'] },
-  { to: '/audience', label: 'Audience', icon: 'users', perms: ['subscribers:get_all', 'subscribers:get'] },
+  { to: '/audience', label: 'Audience', icon: 'users', perms: ['subscribers:get_all', 'subscribers:get'], also: ['/listes', '/rebonds', '/formulaire'] },
   { to: '/modeles', label: 'Modèles', icon: 'page', perms: ['templates:get'] },
   { to: '/medias', label: 'Médias', icon: 'layers', perms: ['media:get'] },
   { to: '/relais', label: 'Relais d’envoi', icon: 'relay', perms: ['settings:get'] },
   { to: '/projets', label: 'Projets', icon: 'layers', perms: ['projects:get', 'projects:manage'] },
   { to: '/equipe', label: 'Équipe', icon: 'users', perms: ['users:get'] },
-  { to: '/reglages', label: 'Réglages', icon: 'gear', perms: ['settings:get'] },
+  { to: '/reglages', label: 'Réglages', icon: 'gear', perms: ['settings:get'], also: ['/maintenance'] },
 ];
+
+const under = (path: string, to: string) => path === to || path.startsWith(`${to}/`);
+
+function isActive(path: string, n: (typeof NAV)[number]) {
+  if (n.to === '/') return path === '/';
+  return under(path, n.to) || (n.also ?? []).some((a) => under(path, a));
+}
 
 function ProjectSwitcher() {
   const { projects, project, setProject, can } = useProject();
@@ -74,6 +82,7 @@ function ProjectSwitcher() {
 
 export function Shell() {
   const { profile, can } = useProject();
+  const { pathname } = useLocation();
   const name = profile?.name || profile?.username || '';
 
   return (
@@ -85,10 +94,10 @@ export function Shell() {
         <ProjectSwitcher />
         <nav className="nav" aria-label="Navigation principale">
           {NAV.filter((n) => !n.perms || can(...n.perms)).map((n) => (
-            <NavLink key={n.to} to={n.to} end={n.to === '/'}>
+            <Link key={n.to} to={n.to} aria-current={isActive(pathname, n) ? 'page' : undefined}>
               <Icon name={n.icon} />
               <span>{n.label}</span>
-            </NavLink>
+            </Link>
           ))}
         </nav>
         <div className="side-foot">

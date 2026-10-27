@@ -307,7 +307,15 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 
 		// Landing page.
 		g.GET("/", func(c *echo.Context) error {
-			return c.Render(http.StatusOK, "home", publicTpl{Title: "listmonk"})
+			if legacyAdmin() {
+				return c.Render(http.StatusOK, "home", publicTpl{Title: "listmonk"})
+			}
+			// A project's own address opens its subscription form; the
+			// main address opens Relais (or its login page).
+			if _, ok := a.hostProject(c); ok && a.cfg.EnablePublicSubPage {
+				return c.Redirect(http.StatusFound, "/subscription/form")
+			}
+			return c.Redirect(http.StatusFound, uriApp)
 		})
 
 		// Public admin endpoints (login page, OIDC endpoints, password reset).

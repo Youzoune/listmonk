@@ -68,7 +68,7 @@ régler dans les paramètres.
 
 ## 4. Après le premier déploiement
 
-* Se connecter sur `https://mailing.youzoune.com/admin/login`, puis ouvrir Relais (`/app`).
+* Se connecter sur `https://mailing.youzoune.com` : on arrive directement dans Relais.
 * Régler les serveurs SMTP (**Paramètres › SMTP** de l'ancienne interface), puis leur projet, leur cadence et
   leur warm-up dans **Relais d'envoi**.
 * Créer les projets : chacun est aussitôt servi sur `<identifiant>.mailing.youzoune.com`.

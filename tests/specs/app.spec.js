@@ -129,4 +129,21 @@ test.describe('Relais app', () => {
     await page.goto(`${APP}/nimporte-quoi`);
     await expect(page.getByRole('heading', { name: 'Page introuvable' })).toBeVisible();
   });
+
+  test('lights the section of every screen in the sidebar', async ({ page }) => {
+    const nav = page.getByRole('navigation', { name: 'Navigation principale' });
+    for (const [url, entry] of [['/listes', 'Audience'], ['/rebonds', 'Audience'], ['/formulaire', 'Audience'], ['/audience/import', 'Audience'],
+      ['/maintenance', 'Réglages'], ['/relais/nouveau', 'Relais d’envoi'], ['/campagnes/nouvelle', 'Campagnes'], ['/', 'Aujourd’hui']]) {
+      await page.goto(`${APP}${url}`);
+      await expect(nav.locator('a[aria-current="page"]')).toHaveText(entry);
+    }
+  });
+
+  test('keeps the bottom of the sidebar in view on long pages', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto(`${APP}/reglages?onglet=smtp`);
+    await page.mouse.wheel(0, 3000);
+    await expect(page.getByRole('link', { name: /Mon compte/ })).toBeInViewport();
+    await expect(page.getByRole('link', { name: 'Guide de l’envoi' })).toBeInViewport();
+  });
 });
