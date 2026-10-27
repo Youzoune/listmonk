@@ -11,6 +11,7 @@ import { Shell } from './components/Shell';
 import { ProjectProvider } from './project';
 import { Audience } from './views/Audience';
 import { Brand } from './views/Brand';
+import { CampaignDetail } from './views/CampaignDetail';
 import { Campaigns } from './views/Campaigns';
 import { Guide } from './views/Guide';
 import { Home } from './views/Home';
@@ -52,6 +53,7 @@ const router = createBrowserRouter(
         { index: true, element: <Home /> },
         { path: 'campagnes', element: <Campaigns /> },
         { path: 'campagnes/nouvelle', element: <NewCampaign /> },
+        { path: 'campagnes/:id', element: <CampaignDetail /> },
         { path: 'audience', element: <Audience /> },
         { path: 'audience/nouveau', element: <SubscriberEdit /> },
         { path: 'audience/import', element: <Import /> },

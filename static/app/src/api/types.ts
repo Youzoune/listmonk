@@ -61,7 +61,16 @@ export interface Campaign {
   started_at: string | null;
   created_at: string;
   updated_at: string;
+  template_id?: number | null;
+  archive?: boolean;
+  archive_slug?: string | null;
+  archive_template_id?: number | null;
+  altbody?: string | null;
+  headers?: Record<string, string>[];
 }
+
+export interface AnalyticsCount { campaign_id: number; count: number; timestamp: string }
+export interface AnalyticsLink { url: string; count: number }
 
 export interface List {
   id: number;

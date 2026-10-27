@@ -363,6 +363,16 @@ a.btn-dark { color: var(--bg); }
 .attr-row input { min-width: 0; min-height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); color: var(--fg); }
 .import-logs, .import-sample { margin: 0; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); font-size: .8rem; overflow-x: auto; white-space: pre; }
 
+/* Campaign page */
+.schedule-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.link-list { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.link-list li { display: flex; justify-content: space-between; gap: 12px; }
+.link-list .mono { overflow-wrap: anywhere; min-width: 0; }
+.legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: middle; margin: 0 4px 0 8px; }
+.legend-views { background: var(--muted); }
+.legend-clicks { background: var(--brand); }
+.tpl-side .preset-row input[type="text"] { flex: 1 1 200px; min-width: 0; min-height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); color: var(--fg); }
+
 /* Guide */
 .guide-layout { display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start; }
 .guide-toc { flex: 1 1 220px; display: grid; gap: 12px; position: sticky; top: 24px; }

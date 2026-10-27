@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api, query } from './client';
 import type {
   Campaign, CampaignStatus, DashboardCharts, DashboardCounts, List, NewCampaign, Page, Profile, Project,
-  ImportParams, ImportStatus, ListInput, ProjectInput, Relay, RelayInput, ServerConfig, Settings, SmtpServer, Subscriber, SubscriberInput, Template, TemplateInput, User,
+  AnalyticsCount, AnalyticsLink, ImportParams, ImportStatus, ListInput, ProjectInput, Relay, RelayInput, ServerConfig, Settings, SmtpServer, Subscriber, SubscriberInput, Template, TemplateInput, User,
 } from './types';
 
 // Query keys start with the project so that switching project refetches everything.
@@ -285,3 +285,71 @@ export function useStopImport() {
 }
 
 export const isNotFound = (e: unknown) => e instanceof ApiError && (e.status === 404 || e.status === 400);
+
+export function useCampaign(project: number | null, id: number | null) {
+  return useQuery({
+    queryKey: key(project, 'campaign', id),
+    queryFn: () => api<Campaign>(`/api/campaigns/${id}`),
+    enabled: !!id,
+    // A running campaign's counters move.
+    refetchInterval: (q) => (q.state.data?.status === 'running' ? 5000 : false),
+  });
+}
+
+// PUT takes the whole campaign: send it back with the changes.
+export function useSaveCampaign(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, campaign }: { id: number; campaign: Record<string, unknown> }) =>
+      api<Campaign>(`/api/campaigns/${id}`, { method: 'PUT', json: campaign }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
+}
+
+export function useCampaignStatus(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: number; status: CampaignStatus }) =>
+      api<Campaign>(`/api/campaigns/${id}/status`, { method: 'PUT', json: { status } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
+}
+
+export function useDeleteCampaign(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api<boolean>(`/api/campaigns/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
+}
+
+export function useCloneCampaign(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (c: Campaign) => api<Campaign>('/api/campaigns', {
+      method: 'POST',
+      json: {
+        name: `Copie de ${c.name}`, subject: c.subject, from_email: c.from_email, lists: c.lists.map((l) => l.id),
+        messenger: c.messenger, content_type: c.content_type, body: c.body, tags: c.tags, template_id: c.template_id ?? undefined,
+      },
+    }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
+}
+
+// Sends the campaign, as currently edited, to contacts of the project.
+export function useTestCampaign() {
+  return useMutation({
+    mutationFn: ({ id, campaign, emails }: { id: number; campaign: Record<string, unknown>; emails: string[] }) =>
+      api<boolean>(`/api/campaigns/${id}/test`, { method: 'POST', json: { ...campaign, subscribers: emails } }),
+  });
+}
+
+export function useCampaignAnalytics(project: number | null, id: number | null, range: { from: string; to: string } | null) {
+  const q = (type: string) => `/api/campaigns/analytics/${type}${query({ id: id ?? 0, from: range?.from, to: range?.to })}`;
+  const enabled = !!id && !!range;
+  const views = useQuery({ queryKey: key(project, 'camp-views', id, range), queryFn: () => api<AnalyticsCount[]>(q('views')), enabled });
+  const clicks = useQuery({ queryKey: key(project, 'camp-clicks', id, range), queryFn: () => api<AnalyticsCount[]>(q('clicks')), enabled });
+  const links = useQuery({ queryKey: key(project, 'camp-links', id, range), queryFn: () => api<AnalyticsLink[]>(q('links')), enabled });
+  return { views, clicks, links };
+}
