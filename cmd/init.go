@@ -235,6 +235,8 @@ func initFS(appDir, staticDir, i18nDir string) stuffbin.FileSystem {
 			"./admin/partials:/admin/partials",
 			"./admin/dist:/admin/static",
 			"./admin/i18n.txt:/admin/i18n.txt",
+			// React admin (static/app), built into static/app/dist and served at /app.
+			"./app/dist:/app",
 			"./email-templates:static/email-templates",
 			"./public:/public",
 		}
@@ -1061,6 +1063,11 @@ func initHTTPServer(cfg *Config, urlCfg *UrlConfig, i *i18n.I18n, fs stuffbin.Fi
 
 	// Admin (frontend) facing static files (SSR admin JS/CSS/asset bundle).
 	srv.GET("/admin/static/*", echo.WrapHandler(fSrv))
+
+	// React admin bundle (hashed assets) and favicon. Its pages are served by
+	// the authenticated /app routes.
+	srv.GET(uriApp+"/assets/*", echo.WrapHandler(fSrv))
+	srv.GET(uriApp+"/favicon.svg", echo.WrapHandler(fSrv))
 
 	// Public (subscriber) facing media upload files.
 	var (

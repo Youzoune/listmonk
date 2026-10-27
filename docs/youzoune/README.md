@@ -15,7 +15,7 @@ Point de départ : `master` upstream au commit `8216c4f1` (après la v7.0.0).
 | 4 | SMTP par projet, SMTP dédié aux notifications système, cadence et warm-up par SMTP | 1, 2, 3 | à faire |
 | 5 | Pages publiques par projet (domaine), désinscription et préférences limitées au projet | 5 | à faire |
 | 6 | Fiabilité au redémarrage pendant les envois | 6 | à faire |
-| 7 | Front (voir la question ouverte plus bas) | Front | à décider |
+| 7 | Front React « Relais » dans `static/app`, servi sous `/app` (voir [static/app/README.md](../../static/app/README.md)) | Front | en cours |
 
 Le détail de conception du multi-projet est dans [multi-projet.md](multi-projet.md).
 
@@ -35,3 +35,6 @@ branchée sur l'API JSON, qui remplacera les vues serveur.
 
 Une maquette React de la nouvelle interface, avec une proposition de marque (« Relais »), est dans
 [maquette/](maquette/) : sources JSX dans `maquette/src`, page autonome générée par `bun ./build.mjs`.
+
+La marque « Relais » est validée (27/10). Le vrai front est dans `static/app` : il reprend les styles et la logique
+de la maquette, sur les données réelles de l'API.
