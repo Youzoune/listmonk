@@ -9,8 +9,8 @@ Point de départ : `master` upstream au commit `8216c4f1` (après la v7.0.0).
 
 | Lot | Contenu | Fonctionnalité du ticket | État |
 |---|---|---|---|
-| 1 | Fondations multi-projet : tables, migration, API de gestion des projets, permissions | 4 | en cours |
-| 2 | Isolation : projet courant sur chaque requête, filtrage de toutes les requêtes SQL (listes, abonnés, campagnes, modèles, médias, imports, exports, tableaux de bord, rebonds) | 4 | à faire |
+| 1 | Fondations multi-projet : tables, migration, API de gestion des projets, permissions | 4 | fait (PR #1) |
+| 2 | Isolation : projet courant sur chaque requête, filtrage de toutes les requêtes SQL (listes, abonnés, campagnes, modèles, médias, imports, exports, tableaux de bord, rebonds) | 4 | fait (migration `v7.2.0`) |
 | 3 | Interface : sélecteur de projet, page de gestion des projets, accès des utilisateurs | 4 | à faire |
 | 4 | SMTP par projet, SMTP dédié aux notifications système, cadence et warm-up par SMTP | 1, 2, 3 | à faire |
 | 5 | Pages publiques par projet (domaine), désinscription et préférences limitées au projet | 5 | à faire |

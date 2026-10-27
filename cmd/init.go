@@ -692,7 +692,7 @@ func initCampaignManager(msgrs []manager.Messenger, q *models.Queries, u *UrlCon
 
 // initTxTemplates initializes and compiles the transactional templates and caches them in-memory.
 func initTxTemplates(m *manager.Manager, co *core.Core) {
-	tpls, err := co.GetTemplates("", models.TemplateTypeTx, false, "", "")
+	tpls, err := co.GetTemplates("", models.TemplateTypeTx, false, "", "", 0)
 	if err != nil {
 		lo.Fatalf("error loading transactional templates: %v", err)
 	}

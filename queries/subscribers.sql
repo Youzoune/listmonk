@@ -1,12 +1,14 @@
 -- subscribers
 -- name: get-subscriber
--- Get a single subscriber by id or UUID or email.
+-- Get a single subscriber by id or UUID or email. An e-mail is unique per
+-- project only, so e-mail lookups take the project ($4, 0 = any project).
 SELECT * FROM subscribers WHERE
     CASE
         WHEN $1 > 0 THEN id = $1
         WHEN $2 != '' THEN uuid = $2::UUID
-        WHEN $3 != '' THEN email = $3
-    END;
+        WHEN $3 != '' THEN LOWER(email) = LOWER($3) AND ($4 = 0 OR project_id = $4)
+    END
+    ORDER BY id LIMIT 1;
 
 -- name: has-subscriber-list
 -- Used for checking access permission by list.
@@ -19,8 +21,8 @@ SELECT s.id AS subscriber_id,
 FROM subscribers s WHERE s.id = ANY($1);
 
 -- name: get-subscribers-by-emails
--- Get subscribers by emails.
-SELECT * FROM subscribers WHERE email=ANY($1);
+-- Get subscribers by emails in a project ($2, 0 = any project).
+SELECT * FROM subscribers WHERE email=ANY($1) AND ($2 = 0 OR project_id = $2);
 
 -- name: get-subscriber-lists
 WITH sub AS (
@@ -86,8 +88,8 @@ SELECT lists.*,
 
 -- name: insert-subscriber
 WITH sub AS (
-    INSERT INTO subscribers (uuid, email, name, status, attribs)
-    VALUES($1, $2, $3, $4, $5)
+    INSERT INTO subscribers (uuid, email, name, status, attribs, project_id)
+    VALUES($1, $2, $3, $4, $5, $9)
     RETURNING id, status
 ),
 listIDs AS (
@@ -116,8 +118,8 @@ SELECT id from sub;
 -- Upserts a subscriber where existing subscribers get their names and attributes overwritten.
 -- If $7 = true, update name/attribs. If $8 = true, update subscription status.
 WITH sub AS (
-    INSERT INTO subscribers as s (uuid, email, name, attribs, status)
-    VALUES($1, $2, $3, $4, 'enabled')
+    INSERT INTO subscribers as s (uuid, email, name, attribs, status, project_id)
+    VALUES($1, $2, $3, $4, 'enabled', $9)
     ON CONFLICT (project_id, LOWER(email))
     DO UPDATE SET
         name=(CASE WHEN $7 THEN $3 ELSE s.name END),
@@ -141,8 +143,8 @@ SELECT uuid, id from sub;
 -- existing subscriptions are marked as 'unsubscribed'.
 -- This is used in the bulk importer.
 WITH sub AS (
-    INSERT INTO subscribers (uuid, email, name, attribs, status)
-    VALUES($1, $2, $3, $4, 'blocklisted')
+    INSERT INTO subscribers (uuid, email, name, attribs, status, project_id)
+    VALUES($1, $2, $3, $4, 'blocklisted', $5)
     ON CONFLICT (project_id, LOWER(email)) DO UPDATE SET status='blocklisted', updated_at=NOW()
     RETURNING id
 )

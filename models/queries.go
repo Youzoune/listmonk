@@ -4,8 +4,10 @@ import "github.com/jmoiron/sqlx"
 
 // Queries contains all prepared SQL queries.
 type Queries struct {
-	GetDashboardCharts *sqlx.Stmt `query:"get-dashboard-charts"`
-	GetDashboardCounts *sqlx.Stmt `query:"get-dashboard-counts"`
+	GetDashboardCharts        *sqlx.Stmt `query:"get-dashboard-charts"`
+	GetDashboardCounts        *sqlx.Stmt `query:"get-dashboard-counts"`
+	GetProjectDashboardCounts *sqlx.Stmt `query:"get-project-dashboard-counts"`
+	GetProjectDashboardCharts *sqlx.Stmt `query:"get-project-dashboard-charts"`
 
 	InsertSubscriber                *sqlx.Stmt `query:"insert-subscriber"`
 	UpsertSubscriber                *sqlx.Stmt `query:"upsert-subscriber"`

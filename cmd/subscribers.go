@@ -13,6 +13,7 @@ import (
 
 	"github.com/jmoiron/sqlx/types"
 	"github.com/knadh/listmonk/internal/auth"
+	"github.com/knadh/listmonk/internal/core"
 	"github.com/knadh/listmonk/internal/i18n"
 	"github.com/knadh/listmonk/internal/notifs"
 	"github.com/knadh/listmonk/internal/subimporter"
@@ -140,7 +141,7 @@ func (a *App) ViewSubscribers(c *echo.Context) error {
 	// Fetch the list being filtered by, if any, to show its name in the header.
 	var curList *models.List
 	if listID > 0 {
-		if l, err := a.core.GetList(listID, ""); err == nil {
+		if l, err := a.core.GetList(listID, "", projectID(c)); err == nil {
 			curList = &l
 		}
 	}
@@ -206,7 +207,7 @@ func (a *App) ViewSubscriberBounces(c *echo.Context) error {
 		return err
 	}
 
-	bounces, _, err := a.core.QueryBounces(0, out.ID, "", "", "", "", 0, 1000)
+	bounces, _, err := a.core.QueryBounces(0, out.ID, "", "", "", "", 0, 0, 1000)
 	if err != nil {
 		return err
 	}
@@ -266,7 +267,7 @@ func (a *App) getViewSubscriber(c *echo.Context) (models.Subscriber, error) {
 		return models.Subscriber{}, err
 	}
 
-	out, err := a.core.GetSubscriber(id, "", "")
+	out, err := a.core.GetSubscriber(id, "", "", 0)
 	if err != nil {
 		return models.Subscriber{}, err
 	}
@@ -280,7 +281,7 @@ func (a *App) getViewableLists(c *echo.Context) ([]models.List, error) {
 	user := auth.GetUser(c)
 
 	hasAllPerm, permittedIDs := user.GetPermittedLists(auth.PermTypeGet)
-	return a.core.GetLists("", models.ListStatusActive, hasAllPerm, permittedIDs)
+	return a.core.GetLists("", models.ListStatusActive, hasAllPerm, permittedIDs, projectID(c))
 }
 
 // getSubscribers queries subscribers from query params for the HTML view. If listID > 0,
@@ -327,6 +328,7 @@ func (a *App) getSubscribers(c *echo.Context, listID int) ([]models.Subscriber, 
 		q.Get("status"),
 		q.Get("order"),
 		q.Get("order_by"),
+		projectID(c),
 		pg.Offset,
 		pg.Limit)
 	if err != nil {
@@ -351,7 +353,7 @@ func (a *App) GetSubscriber(c *echo.Context) error {
 	}
 
 	// Fetch the subscriber from the DB.
-	out, err := a.core.GetSubscriber(id, "", "")
+	out, err := a.core.GetSubscriber(id, "", "", 0)
 	if err != nil {
 		return err
 	}
@@ -424,7 +426,7 @@ func (a *App) QuerySubscribers(c *echo.Context) error {
 	)
 
 	// Query subscribers from the DB.
-	res, total, err := a.core.QuerySubscribers(searchStr, query, listIDs, subStatus, subscriberStatus, order, orderBy, pg.Offset, pg.Limit)
+	res, total, err := a.core.QuerySubscribers(searchStr, query, listIDs, subStatus, subscriberStatus, order, orderBy, projectID(c), pg.Offset, pg.Limit)
 	if err != nil {
 		return err
 	}
@@ -463,6 +465,9 @@ func (a *App) ExportSubscribers(c *echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, a.i18n.T("globals.messages.invalidID"))
 	}
+	if err := a.requireOwned(c, core.EntitySubscriber, subIDs...); err != nil {
+		return err
+	}
 
 	// Filter by subscription status
 	subStatus := c.QueryParam("subscription_status")
@@ -480,7 +485,7 @@ func (a *App) ExportSubscribers(c *echo.Context) error {
 	}
 
 	// Get the batched export iterator.
-	exp, err := a.core.ExportSubscribers(searchStr, query, subIDs, listIDs, subStatus, c.QueryParam("status"), a.cfg.DBBatchSize)
+	exp, err := a.core.ExportSubscribers(searchStr, query, subIDs, listIDs, subStatus, c.QueryParam("status"), projectID(c), a.cfg.DBBatchSize)
 	if err != nil {
 		return err
 	}
@@ -551,6 +556,12 @@ func (a *App) CreateSubscriber(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusForbidden, a.i18n.Ts("globals.messages.permissionDenied", "name", "lists"))
 	}
 
+	// The subscriber and its lists belong to the current project.
+	if err := a.requireOwned(c, core.EntityList, listIDs...); err != nil {
+		return err
+	}
+	req.Subscriber.ProjectID = projectID(c)
+
 	// Insert the subscriber into the DB.
 	sub, _, err := a.core.InsertSubscriber(req.Subscriber, listIDs, nil, req.PreconfirmSubs, false)
 	if err != nil {
@@ -612,6 +623,10 @@ func (a *App) UpdateSubscriber(c *echo.Context) error {
 		permittedLists = []int{}
 	}
 
+	if err := a.requireOwned(c, core.EntityList, listIDs...); err != nil {
+		return err
+	}
+
 	out, _, err := a.core.UpdateSubscriberWithLists(id, req.Subscriber, listIDs, nil, req.PreconfirmSubs, true, false, permittedLists, false)
 	if err != nil {
 		return err
@@ -635,7 +650,7 @@ func (a *App) PatchSubscriber(c *echo.Context) error {
 	}
 
 	// Fetch the sub subscriber from the DB.
-	sub, err := a.core.GetSubscriber(id, "", "")
+	sub, err := a.core.GetSubscriber(id, "", "", 0)
 	if err != nil {
 		return err
 	}
@@ -684,6 +699,10 @@ func (a *App) PatchSubscriber(c *echo.Context) error {
 		permittedLists = []int{}
 	}
 
+	if err := a.requireOwned(c, core.EntityList, listIDs...); err != nil {
+		return err
+	}
+
 	out, _, err := a.core.UpdateSubscriberWithLists(id, req.Subscriber, listIDs, nil, req.PreconfirmSubs, overwriteSubs, false, permittedLists, false)
 	if err != nil {
 		return err
@@ -704,7 +723,7 @@ func (a *App) SubscriberSendOptin(c *echo.Context) error {
 		return err
 	}
 
-	out, err := a.core.GetSubscriber(id, "", "")
+	out, err := a.core.GetSubscriber(id, "", "", 0)
 	if err != nil {
 		return err
 	}
@@ -749,6 +768,9 @@ func (a *App) BlocklistSubscribers(c *echo.Context) error {
 	}
 
 	if err := a.hasSubPerm(user, auth.PermTypeManage, req.SubscriberIDs); err != nil {
+		return err
+	}
+	if err := a.requireOwned(c, core.EntitySubscriber, req.SubscriberIDs...); err != nil {
 		return err
 	}
 
@@ -805,6 +827,14 @@ func (a *App) ManageSubscriberLists(c *echo.Context) error {
 	// User doesn't have the required list permissions.
 	if len(listIDs) == 0 {
 		return echo.NewHTTPError(http.StatusForbidden, a.i18n.Ts("globals.messages.permissionDenied", "name", "lists"))
+	}
+
+	// Subscribers and lists must belong to the current project.
+	if err := a.requireOwned(c, core.EntitySubscriber, subIDs...); err != nil {
+		return err
+	}
+	if err := a.requireOwned(c, core.EntityList, listIDs...); err != nil {
+		return err
 	}
 
 	// Run the action in the DB.
@@ -865,6 +895,9 @@ func (a *App) DeleteSubscribers(c *echo.Context) error {
 	if err := a.hasSubPerm(user, auth.PermTypeManage, ids); err != nil {
 		return err
 	}
+	if err := a.requireOwned(c, core.EntitySubscriber, ids...); err != nil {
+		return err
+	}
 
 	// Delete the subscribers from the DB.
 	if err := a.core.DeleteSubscribers(ids, nil); err != nil {
@@ -903,7 +936,7 @@ func (a *App) DeleteSubscribersByQuery(c *echo.Context) error {
 	listIDs := user.GetPermittedListIDs(auth.PermTypeManage, req.ListIDs)
 
 	// Delete the subscribers from the DB.
-	if err := a.core.DeleteSubscribersByQuery(req.Search, req.Query, listIDs, req.SubscriptionStatus, req.SubscriberStatus); err != nil {
+	if err := a.core.DeleteSubscribersByQuery(req.Search, req.Query, listIDs, req.SubscriptionStatus, req.SubscriberStatus, projectID(c)); err != nil {
 		return err
 	}
 
@@ -938,7 +971,7 @@ func (a *App) BlocklistSubscribersByQuery(c *echo.Context) error {
 	listIDs := user.GetPermittedListIDs(auth.PermTypeManage, req.ListIDs)
 
 	// Update the subscribers in the DB.
-	if err := a.core.BlocklistSubscribersByQuery(req.Search, req.Query, listIDs, req.SubscriptionStatus, req.SubscriberStatus); err != nil {
+	if err := a.core.BlocklistSubscribersByQuery(req.Search, req.Query, listIDs, req.SubscriptionStatus, req.SubscriberStatus, projectID(c)); err != nil {
 		return err
 	}
 
@@ -977,6 +1010,9 @@ func (a *App) ManageSubscriberListsByQuery(c *echo.Context) error {
 	// Filter lists against the current user's permitted lists.
 	sourceListIDs := user.GetPermittedListIDs(auth.PermTypeManage, req.ListIDs)
 	targetListIDs := user.FilterListsByPerm(auth.PermTypeManage, req.TargetListIDs)
+	if err := a.requireOwned(c, core.EntityList, targetListIDs...); err != nil {
+		return err
+	}
 
 	// Run the action in the DB.
 	var err error
@@ -985,11 +1021,11 @@ func (a *App) ManageSubscriberListsByQuery(c *echo.Context) error {
 		if err := a.validateSubscriptionStatus(req.Status); err != nil {
 			return err
 		}
-		err = a.core.AddSubscriptionsByQuery(req.Search, req.Query, sourceListIDs, targetListIDs, req.Status, req.SubscriptionStatus, req.SubscriberStatus)
+		err = a.core.AddSubscriptionsByQuery(req.Search, req.Query, sourceListIDs, targetListIDs, req.Status, req.SubscriptionStatus, req.SubscriberStatus, projectID(c))
 	case models.SubscriptionActionRemove:
-		err = a.core.DeleteSubscriptionsByQuery(req.Search, req.Query, sourceListIDs, targetListIDs, req.SubscriptionStatus, req.SubscriberStatus)
+		err = a.core.DeleteSubscriptionsByQuery(req.Search, req.Query, sourceListIDs, targetListIDs, req.SubscriptionStatus, req.SubscriberStatus, projectID(c))
 	case models.SubscriptionActionUnsubscribe:
-		err = a.core.UnsubscribeListsByQuery(req.Search, req.Query, sourceListIDs, targetListIDs, req.SubscriptionStatus, req.SubscriberStatus)
+		err = a.core.UnsubscribeListsByQuery(req.Search, req.Query, sourceListIDs, targetListIDs, req.SubscriptionStatus, req.SubscriberStatus, projectID(c))
 	default:
 		return echo.NewHTTPError(http.StatusBadRequest, a.i18n.T("globals.messages.invalidAction"))
 	}

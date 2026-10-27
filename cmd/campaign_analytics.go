@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/knadh/listmonk/internal/auth"
+	"github.com/knadh/listmonk/internal/core"
 	"github.com/knadh/listmonk/models"
 	"github.com/labstack/echo/v5"
 )
@@ -119,6 +120,14 @@ func (a *App) viewAnalytics(c *echo.Context, resource string) error {
 			ids[i] = item.ID
 		}
 
+		entity := core.EntityCampaign
+		if resource == models.ResourceLists {
+			entity = core.EntityList
+		}
+		if err := a.requireOwned(c, entity, ids...); err != nil {
+			return err
+		}
+
 		data.HasData = true
 		data.Data.Items = items
 		getCounts := a.core.GetCampaignAnalyticsCounts
@@ -209,6 +218,14 @@ func (a *App) getAnalytics(c *echo.Context, resource string) error {
 	if len(ids) == 0 {
 		return echo.NewHTTPError(http.StatusBadRequest,
 			a.i18n.Ts("globals.messages.missingFields", "name", "`id`"))
+	}
+
+	entity := core.EntityCampaign
+	if resource == models.ResourceLists {
+		entity = core.EntityList
+	}
+	if err := a.requireOwned(c, entity, ids...); err != nil {
+		return err
 	}
 
 	getCounts := a.core.GetCampaignAnalyticsCounts

@@ -1,7 +1,13 @@
 -- name: record-bounce
 -- Insert a bounce and count the bounces for the subscriber and either unsubscribe them,
 WITH sub AS (
-    SELECT id, status FROM subscribers WHERE CASE WHEN $1 != '' THEN uuid = $1::UUID ELSE email = $2 END
+    -- By UUID, or by e-mail within the project of the campaign when there's one.
+    -- An e-mail may exist in several projects; without a campaign, the oldest wins.
+    SELECT id, status FROM subscribers WHERE CASE WHEN $1 != '' THEN uuid = $1::UUID
+        ELSE LOWER(email) = LOWER($2)
+            AND ($3 = '' OR project_id = (SELECT project_id FROM campaigns WHERE uuid = $3::UUID))
+        END
+    ORDER BY id LIMIT 1
 ),
 camp AS (
     SELECT id FROM campaigns WHERE $3 != '' AND uuid = $3::UUID
@@ -54,6 +60,8 @@ WHERE ($1 = 0 OR bounces.id = $1)
     AND ($3 = 0 OR bounces.subscriber_id = $3)
     AND ($4 = '' OR bounces.source = $4)
     AND ($5 = '' OR bounces.type = $5::bounce_type)
+    -- Optional project (0 = all projects).
+    AND ($8 = 0 OR subscribers.project_id = $8)
 ORDER BY %order% OFFSET $6 LIMIT (CASE WHEN $7 < 1 THEN NULL ELSE $7 END);
 
 -- name: delete-bounces
@@ -61,7 +69,9 @@ DELETE FROM bounces WHERE CASE WHEN $2 THEN
     ($3 = 0 OR campaign_id = $3)
     AND ($4 = '' OR source = $4)
     AND ($5 = '' OR type = $5::bounce_type)
-ELSE id = ANY($1) END;
+ELSE id = ANY($1) END
+-- Optional project (0 = all projects).
+AND ($6 = 0 OR subscriber_id IN (SELECT id FROM subscribers WHERE project_id = $6));
 
 -- name: delete-bounces-by-subscriber
 WITH sub AS (
@@ -77,6 +87,8 @@ WITH subs AS (
         AND ($3 = '' OR source = $3)
         AND ($4 = '' OR type = $4::bounce_type)
     END
+    -- Optional project (0 = all projects).
+    AND ($5 = 0 OR subscriber_id IN (SELECT id FROM subscribers WHERE project_id = $5))
 ),
 b AS (
     UPDATE subscribers SET status='blocklisted', updated_at=NOW()

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/knadh/listmonk/internal/core"
 	"io"
 	"net/http"
 	"net/textproto"
@@ -70,6 +71,14 @@ func (a *App) SendTxMessage(c *echo.Context) error {
 		m = r
 	}
 
+	// The template and the subscribers must belong to the request's project.
+	if err := a.requireOwned(c, core.EntityTemplate, m.TemplateID); err != nil {
+		return err
+	}
+	if err := a.requireOwned(c, core.EntitySubscriber, m.SubscriberIDs...); err != nil {
+		return err
+	}
+
 	// Get the cached tx template.
 	tpl, err := a.manager.GetTpl(m.TemplateID)
 	if err != nil {
@@ -110,7 +119,7 @@ func (a *App) SendTxMessage(c *echo.Context) error {
 			}
 
 			var err error
-			sub, err = a.core.GetSubscriber(subID, "", subEmail)
+			sub, err = a.core.GetSubscriber(subID, "", subEmail, projectID(c))
 			if err != nil {
 				if er, ok := err.(*echo.HTTPError); ok && er.Code == http.StatusBadRequest {
 					// `fallback`: Create an ephemeral "subscriber" if the subscriber wasn't found.

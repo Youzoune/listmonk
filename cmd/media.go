@@ -78,7 +78,7 @@ func (a *App) getMedia(c *echo.Context) ([]media.Media, models.PageProps, error)
 	q := makeQuery(c.Request().URL.Query(), mediaQueryDefaults)
 
 	pg := a.pg.NewFromURL(q)
-	res, total, err := a.core.QueryMedia(a.cfg.MediaUpload.Provider, a.media, q.Get("query"), pg.Offset, pg.Limit)
+	res, total, err := a.core.QueryMedia(a.cfg.MediaUpload.Provider, a.media, q.Get("query"), projectID(c), pg.Offset, pg.Limit)
 	if err != nil {
 		return nil, models.PageProps{}, err
 	}
@@ -194,7 +194,7 @@ func (a *App) UploadMedia(c *echo.Context) error {
 	}
 
 	// Insert the media into the DB.
-	m, err := a.core.InsertMedia(fName, thumbfName, contentType, meta, a.cfg.MediaUpload.Provider, a.media)
+	m, err := a.core.InsertMedia(fName, thumbfName, contentType, meta, a.cfg.MediaUpload.Provider, a.media, projectID(c))
 	if err != nil {
 		cleanUp = true
 		return err
@@ -211,7 +211,7 @@ func (a *App) GetAllMedia(c *echo.Context) error {
 		pg = a.pg.NewFromURL(c.Request().URL.Query())
 	)
 	// Fetch the media items from the DB.
-	res, total, err := a.core.QueryMedia(a.cfg.MediaUpload.Provider, a.media, query, pg.Offset, pg.Limit)
+	res, total, err := a.core.QueryMedia(a.cfg.MediaUpload.Provider, a.media, query, projectID(c), pg.Offset, pg.Limit)
 	if err != nil {
 		return err
 	}

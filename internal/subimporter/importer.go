@@ -98,6 +98,10 @@ type SessionOpt struct {
 	OverwriteSubStatus bool   `json:"overwrite_subscription_status"`
 	Delim              string `json:"delim"`
 	ListIDs            []int  `json:"lists"`
+
+	// ProjectID is the project subscribers are imported into. It's set by
+	// the server from the request's project, never from the request body.
+	ProjectID int `json:"-"`
 }
 
 // Status represents statistics from an ongoing import session.
@@ -308,9 +312,9 @@ func (s *Session) Start() {
 		}
 
 		if s.opt.Mode == ModeSubscribe {
-			_, err = stmt.Exec(uu, sub.Email, sub.Name, sub.Attribs, pq.Array(listIDs), s.opt.SubStatus, s.opt.OverwriteUserInfo, s.opt.OverwriteSubStatus)
+			_, err = stmt.Exec(uu, sub.Email, sub.Name, sub.Attribs, pq.Array(listIDs), s.opt.SubStatus, s.opt.OverwriteUserInfo, s.opt.OverwriteSubStatus, s.opt.ProjectID)
 		} else if s.opt.Mode == ModeBlocklist {
-			_, err = stmt.Exec(uu, sub.Email, sub.Name, sub.Attribs)
+			_, err = stmt.Exec(uu, sub.Email, sub.Name, sub.Attribs, s.opt.ProjectID)
 		}
 		if err != nil {
 			s.log.Printf("error executing insert: %v", err)

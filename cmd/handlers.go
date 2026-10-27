@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/knadh/listmonk/internal/auth"
+	"github.com/knadh/listmonk/internal/core"
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
 )
@@ -66,7 +67,7 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 
 				return next(c)
 			}
-		})
+		}, a.projectMiddleware)
 
 		// Authenticated endpoints. As views are ported to the SSR admin, register
 		// their routes here. Unported /admin/* paths fall through to the 404 handler.
@@ -80,30 +81,30 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 		g.GET(path.Join(uriAdmin, "/lists"), a.adminPage(a.ViewLists))
 		g.GET(path.Join(uriAdmin, "/lists/analytics"), a.adminPage(a.ViewListAnalytics))
 		g.GET(path.Join(uriAdmin, "/lists/new"), a.adminPage(pm(a.ViewNewList, auth.PermListManageAll)))
-		g.GET(path.Join(uriAdmin, "/lists/:id"), a.adminPage(hasID(a.ViewList)))
-		g.GET(path.Join(uriAdmin, "/lists/:id/edit"), a.adminPage(hasID(a.ViewList)))
+		g.GET(path.Join(uriAdmin, "/lists/:id"), a.adminPage(hasID(a.owned(core.EntityList, a.ViewList))))
+		g.GET(path.Join(uriAdmin, "/lists/:id/edit"), a.adminPage(hasID(a.owned(core.EntityList, a.ViewList))))
 		g.GET(path.Join(uriAdmin, "/lists/forms"), a.adminPage(a.ViewForms))
 		g.GET(path.Join(uriAdmin, "/campaigns"), a.adminPage(pm(a.ViewCampaigns, auth.PermCampaignsGetAll, auth.PermCampaignsGet)))
 		g.GET(path.Join(uriAdmin, "/campaigns/media"), a.adminPage(pm(a.ViewMedia, auth.PermMediaGet)))
 		g.GET(path.Join(uriAdmin, "/campaigns/media/fragment"), a.adminPage(pm(a.ViewMediaFragment, auth.PermMediaGet)))
 		g.GET(path.Join(uriAdmin, "/campaigns/analytics"), a.adminPage(pm(a.ViewCampaignAnalytics, auth.PermCampaignsGetAnalytics)))
 		g.GET(path.Join(uriAdmin, "/campaigns/new"), a.adminPage(pm(a.ViewNewCampaign, auth.PermCampaignsManageAll, auth.PermCampaignsManage)))
-		g.GET(path.Join(uriAdmin, "/campaigns/:id"), a.adminPage(pm(hasID(a.ViewCampaign), auth.PermCampaignsGetAll, auth.PermCampaignsGet)))
-		g.GET(path.Join(uriAdmin, "/campaigns/:id/:tab"), a.adminPage(pm(hasID(a.ViewCampaign), auth.PermCampaignsGetAll, auth.PermCampaignsGet)))
+		g.GET(path.Join(uriAdmin, "/campaigns/:id"), a.adminPage(pm(hasID(a.owned(core.EntityCampaign, a.ViewCampaign)), auth.PermCampaignsGetAll, auth.PermCampaignsGet)))
+		g.GET(path.Join(uriAdmin, "/campaigns/:id/:tab"), a.adminPage(pm(hasID(a.owned(core.EntityCampaign, a.ViewCampaign)), auth.PermCampaignsGetAll, auth.PermCampaignsGet)))
 		g.GET(path.Join(uriAdmin, "/templates"), a.adminPage(pm(a.ViewTemplates, auth.PermTemplatesGet)))
 		g.GET(path.Join(uriAdmin, "/templates/new"), a.adminPage(pm(a.ViewNewTemplate, auth.PermTemplatesManage)))
-		g.GET(path.Join(uriAdmin, "/templates/:id"), a.adminPage(pm(hasID(a.ViewTemplate), auth.PermTemplatesGet)))
+		g.GET(path.Join(uriAdmin, "/templates/:id"), a.adminPage(pm(hasID(a.owned(core.EntityTemplate, a.ViewTemplate)), auth.PermTemplatesGet)))
 		g.GET(path.Join(uriAdmin, "/subscribers/import"), a.adminPage(pm(a.ViewImport, auth.PermSubscribersImport)))
 		g.GET(path.Join(uriAdmin, "/subscribers/bounces"), a.adminPage(pm(a.ViewBounces, auth.PermBouncesGet)))
 		g.GET(path.Join(uriAdmin, "/subscribers"), a.adminPage(pm(a.ViewSubscribers, auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
 		g.POST(path.Join(uriAdmin, "/subscribers"), a.adminPage(pm(a.ViewSubscribers, auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
-		g.GET(path.Join(uriAdmin, "/subscribers/lists/:id"), a.adminPage(pm(hasID(a.ViewSubscribers), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
-		g.POST(path.Join(uriAdmin, "/subscribers/lists/:id"), a.adminPage(pm(hasID(a.ViewSubscribers), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
+		g.GET(path.Join(uriAdmin, "/subscribers/lists/:id"), a.adminPage(pm(hasID(a.owned(core.EntityList, a.ViewSubscribers)), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
+		g.POST(path.Join(uriAdmin, "/subscribers/lists/:id"), a.adminPage(pm(hasID(a.owned(core.EntityList, a.ViewSubscribers)), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
 		g.GET(path.Join(uriAdmin, "/subscribers/new"), a.adminPage(pm(a.ViewNewSubscriber, auth.PermSubscribersManage)))
-		g.GET(path.Join(uriAdmin, "/subscribers/:id/edit"), a.adminPage(pm(hasID(a.ViewSubscriber), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
-		g.GET(path.Join(uriAdmin, "/subscribers/:id"), a.adminPage(pm(hasID(a.ViewSubscriberInfo), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
-		g.GET(path.Join(uriAdmin, "/subscribers/:id/lists"), a.adminPage(pm(hasID(a.ViewSubscriber), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
-		g.GET(path.Join(uriAdmin, "/subscribers/:id/bounces"), a.adminPage(pm(pm(hasID(a.ViewSubscriberBounces), auth.PermBouncesGet), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
+		g.GET(path.Join(uriAdmin, "/subscribers/:id/edit"), a.adminPage(pm(hasID(a.owned(core.EntitySubscriber, a.ViewSubscriber)), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
+		g.GET(path.Join(uriAdmin, "/subscribers/:id"), a.adminPage(pm(hasID(a.owned(core.EntitySubscriber, a.ViewSubscriberInfo)), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
+		g.GET(path.Join(uriAdmin, "/subscribers/:id/lists"), a.adminPage(pm(hasID(a.owned(core.EntitySubscriber, a.ViewSubscriber)), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
+		g.GET(path.Join(uriAdmin, "/subscribers/:id/bounces"), a.adminPage(pm(pm(hasID(a.owned(core.EntitySubscriber, a.ViewSubscriberBounces)), auth.PermBouncesGet), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
 
 		// Users and roles. Static segments are registered before the :id param routes.
 		g.GET(path.Join(uriAdmin, "/users"), a.adminPage(pm(a.ViewUsers, auth.PermUsersGet)))
@@ -142,7 +143,7 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 
 					return next(c)
 				}
-			})
+			}, a.projectMiddleware)
 		)
 
 		// API endpoints.
@@ -163,28 +164,28 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 		g.GET("/api/about", a.GetAboutInfo)
 
 		g.GET("/api/subscribers", pm(a.QuerySubscribers, auth.PermSubscribersGetAll, auth.PermSubscribersGet))
-		g.GET("/api/subscribers/:id", pm(hasID(a.GetSubscriber), auth.PermSubscribersGetAll, auth.PermSubscribersGet))
-		g.GET("/api/subscribers/:id/activity", pm(hasID(a.GetSubscriberActivity), auth.PermSubscribersGetAll, auth.PermSubscribersGet))
-		g.DELETE("/api/subscribers/:id/activity/:type", pm(hasID(a.DeleteSubscriberActivity), auth.PermSubscribersManage))
-		g.GET("/api/subscribers/:id/export", pm(hasID(a.ExportSubscriberData), auth.PermSubscribersGetAll, auth.PermSubscribersGet))
-		g.GET("/api/subscribers/:id/bounces", pm(hasID(a.GetSubscriberBounces), auth.PermBouncesGet))
-		g.DELETE("/api/subscribers/:id/bounces", pm(hasID(a.DeleteSubscriberBounces), auth.PermBouncesManage))
+		g.GET("/api/subscribers/:id", pm(hasID(a.owned(core.EntitySubscriber, a.GetSubscriber)), auth.PermSubscribersGetAll, auth.PermSubscribersGet))
+		g.GET("/api/subscribers/:id/activity", pm(hasID(a.owned(core.EntitySubscriber, a.GetSubscriberActivity)), auth.PermSubscribersGetAll, auth.PermSubscribersGet))
+		g.DELETE("/api/subscribers/:id/activity/:type", pm(hasID(a.owned(core.EntitySubscriber, a.DeleteSubscriberActivity)), auth.PermSubscribersManage))
+		g.GET("/api/subscribers/:id/export", pm(hasID(a.owned(core.EntitySubscriber, a.ExportSubscriberData)), auth.PermSubscribersGetAll, auth.PermSubscribersGet))
+		g.GET("/api/subscribers/:id/bounces", pm(hasID(a.owned(core.EntitySubscriber, a.GetSubscriberBounces)), auth.PermBouncesGet))
+		g.DELETE("/api/subscribers/:id/bounces", pm(hasID(a.owned(core.EntitySubscriber, a.DeleteSubscriberBounces)), auth.PermBouncesManage))
 		g.POST("/api/subscribers", pm(a.CreateSubscriber, auth.PermSubscribersManage))
-		g.PUT("/api/subscribers/:id", pm(hasID(a.UpdateSubscriber), auth.PermSubscribersManage))
-		g.PATCH("/api/subscribers/:id", pm(hasID(a.PatchSubscriber), auth.PermSubscribersManage))
-		g.POST("/api/subscribers/:id/optin", pm(hasID(a.SubscriberSendOptin), auth.PermSubscribersManage))
+		g.PUT("/api/subscribers/:id", pm(hasID(a.owned(core.EntitySubscriber, a.UpdateSubscriber)), auth.PermSubscribersManage))
+		g.PATCH("/api/subscribers/:id", pm(hasID(a.owned(core.EntitySubscriber, a.PatchSubscriber)), auth.PermSubscribersManage))
+		g.POST("/api/subscribers/:id/optin", pm(hasID(a.owned(core.EntitySubscriber, a.SubscriberSendOptin)), auth.PermSubscribersManage))
 		g.PUT("/api/subscribers/blocklist", pm(a.BlocklistSubscribers, auth.PermSubscribersManage))
-		g.PUT("/api/subscribers/:id/blocklist", pm(hasID(a.BlocklistSubscriber), auth.PermSubscribersManage))
+		g.PUT("/api/subscribers/:id/blocklist", pm(hasID(a.owned(core.EntitySubscriber, a.BlocklistSubscriber)), auth.PermSubscribersManage))
 		g.PUT("/api/subscribers/lists/:id", pm(a.ManageSubscriberLists, auth.PermSubscribersManage))
 		g.PUT("/api/subscribers/lists", pm(a.ManageSubscriberLists, auth.PermSubscribersManage))
-		g.DELETE("/api/subscribers/:id", pm(hasID(a.DeleteSubscriber), auth.PermSubscribersManage))
+		g.DELETE("/api/subscribers/:id", pm(hasID(a.owned(core.EntitySubscriber, a.DeleteSubscriber)), auth.PermSubscribersManage))
 		g.DELETE("/api/subscribers", pm(a.DeleteSubscribers, auth.PermSubscribersManage))
 
 		g.GET("/api/bounces", pm(a.GetBounces, auth.PermBouncesGet))
 		g.PUT("/api/bounces/blocklist", pm(a.BlocklistBouncedSubscribers, auth.PermBouncesManage))
-		g.GET("/api/bounces/:id", pm(hasID(a.GetBounce), auth.PermBouncesGet))
+		g.GET("/api/bounces/:id", pm(hasID(a.owned(core.EntityBounce, a.GetBounce)), auth.PermBouncesGet))
 		g.DELETE("/api/bounces", pm(a.DeleteBounces, auth.PermBouncesManage))
-		g.DELETE("/api/bounces/:id", pm(hasID(a.DeleteBounce), auth.PermBouncesManage))
+		g.DELETE("/api/bounces/:id", pm(hasID(a.owned(core.EntityBounce, a.DeleteBounce)), auth.PermBouncesManage))
 
 		// Subscriber operations based on arbitrary SQL queries.
 		// These aren't very REST-like.
@@ -202,42 +203,42 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 		// Individual list permissions are applied directly within handleGetLists.
 		g.GET("/api/lists", a.GetLists)
 		g.GET("/api/lists/analytics/:type", a.GetListAnalytics)
-		g.GET("/api/lists/:id", hasID(a.GetList))
+		g.GET("/api/lists/:id", hasID(a.owned(core.EntityList, a.GetList)))
 		g.POST("/api/lists", pm(a.CreateList, auth.PermListManageAll))
-		g.PUT("/api/lists/:id", hasID(a.UpdateList))
+		g.PUT("/api/lists/:id", hasID(a.owned(core.EntityList, a.UpdateList)))
 		g.DELETE("/api/lists", a.DeleteLists)
-		g.DELETE("/api/lists/:id", hasID(a.DeleteList))
+		g.DELETE("/api/lists/:id", hasID(a.owned(core.EntityList, a.DeleteList)))
 
 		g.GET("/api/campaigns", pm(a.GetCampaigns, auth.PermCampaignsGetAll, auth.PermCampaignsGet))
 		g.GET("/api/campaigns/running/stats", pm(a.GetRunningCampaignStats, auth.PermCampaignsGetAll, auth.PermCampaignsGet))
-		g.GET("/api/campaigns/:id", pm(hasID(a.GetCampaign), auth.PermCampaignsGetAll, auth.PermCampaignsGet))
+		g.GET("/api/campaigns/:id", pm(hasID(a.owned(core.EntityCampaign, a.GetCampaign)), auth.PermCampaignsGetAll, auth.PermCampaignsGet))
 		g.GET("/api/campaigns/analytics/:type", pm(a.GetCampaignViewAnalytics, auth.PermCampaignsGetAnalytics))
-		g.GET("/api/campaigns/:id/preview", pm(hasID(a.PreviewCampaign), auth.PermCampaignsGetAll, auth.PermCampaignsGet))
-		g.POST("/api/campaigns/:id/preview/archive", pm(hasID(a.PreviewCampaignArchive), auth.PermCampaignsGetAll, auth.PermCampaignsGet))
-		g.POST("/api/campaigns/:id/preview", pm(hasID(a.PreviewCampaign), auth.PermCampaignsGetAll, auth.PermCampaignsGet))
-		g.POST("/api/campaigns/:id/content", pm(hasID(a.CampaignContent), auth.PermCampaignsManageAll, auth.PermCampaignsManage))
-		g.POST("/api/campaigns/:id/text", pm(hasID(a.PreviewCampaign), auth.PermCampaignsGet))
-		g.POST("/api/campaigns/:id/test", pm(hasID(a.TestCampaign), auth.PermCampaignsManageAll, auth.PermCampaignsManage))
+		g.GET("/api/campaigns/:id/preview", pm(hasID(a.owned(core.EntityCampaign, a.PreviewCampaign)), auth.PermCampaignsGetAll, auth.PermCampaignsGet))
+		g.POST("/api/campaigns/:id/preview/archive", pm(hasID(a.owned(core.EntityCampaign, a.PreviewCampaignArchive)), auth.PermCampaignsGetAll, auth.PermCampaignsGet))
+		g.POST("/api/campaigns/:id/preview", pm(hasID(a.owned(core.EntityCampaign, a.PreviewCampaign)), auth.PermCampaignsGetAll, auth.PermCampaignsGet))
+		g.POST("/api/campaigns/:id/content", pm(hasID(a.owned(core.EntityCampaign, a.CampaignContent)), auth.PermCampaignsManageAll, auth.PermCampaignsManage))
+		g.POST("/api/campaigns/:id/text", pm(hasID(a.owned(core.EntityCampaign, a.PreviewCampaign)), auth.PermCampaignsGet))
+		g.POST("/api/campaigns/:id/test", pm(hasID(a.owned(core.EntityCampaign, a.TestCampaign)), auth.PermCampaignsManageAll, auth.PermCampaignsManage))
 		g.POST("/api/campaigns", pm(a.CreateCampaign, auth.PermCampaignsManageAll, auth.PermCampaignsManage))
-		g.PUT("/api/campaigns/:id", pm(hasID(a.UpdateCampaign), auth.PermCampaignsManageAll, auth.PermCampaignsManage))
-		g.PUT("/api/campaigns/:id/status", pm(hasID(a.UpdateCampaignStatus), auth.PermCampaignsSend))
-		g.PUT("/api/campaigns/:id/archive", pm(hasID(a.UpdateCampaignArchive), auth.PermCampaignsManageAll, auth.PermCampaignsManage))
+		g.PUT("/api/campaigns/:id", pm(hasID(a.owned(core.EntityCampaign, a.UpdateCampaign)), auth.PermCampaignsManageAll, auth.PermCampaignsManage))
+		g.PUT("/api/campaigns/:id/status", pm(hasID(a.owned(core.EntityCampaign, a.UpdateCampaignStatus)), auth.PermCampaignsSend))
+		g.PUT("/api/campaigns/:id/archive", pm(hasID(a.owned(core.EntityCampaign, a.UpdateCampaignArchive)), auth.PermCampaignsManageAll, auth.PermCampaignsManage))
 		g.DELETE("/api/campaigns", pm(a.DeleteCampaigns, auth.PermCampaignsManage, auth.PermCampaignsManageAll))
-		g.DELETE("/api/campaigns/:id", pm(hasID(a.DeleteCampaign), auth.PermCampaignsManageAll, auth.PermCampaignsManage))
+		g.DELETE("/api/campaigns/:id", pm(hasID(a.owned(core.EntityCampaign, a.DeleteCampaign)), auth.PermCampaignsManageAll, auth.PermCampaignsManage))
 
 		g.GET("/api/media", pm(a.GetAllMedia, auth.PermMediaGet))
-		g.GET("/api/media/:id", pm(hasID(a.GetMedia), auth.PermMediaGet))
+		g.GET("/api/media/:id", pm(hasID(a.owned(core.EntityMedia, a.GetMedia)), auth.PermMediaGet))
 		g.POST("/api/media", pm(a.UploadMedia, auth.PermMediaManage))
-		g.DELETE("/api/media/:id", pm(hasID(a.DeleteMedia), auth.PermMediaManage))
+		g.DELETE("/api/media/:id", pm(hasID(a.owned(core.EntityMedia, a.DeleteMedia)), auth.PermMediaManage))
 
 		g.GET("/api/templates", pm(a.GetTemplates, auth.PermTemplatesGet))
-		g.GET("/api/templates/:id", pm(hasID(a.GetTemplate), auth.PermTemplatesGet))
-		g.GET("/api/templates/:id/preview", pm(hasID(a.PreviewTemplate), auth.PermTemplatesGet))
+		g.GET("/api/templates/:id", pm(hasID(a.owned(core.EntityTemplate, a.GetTemplate)), auth.PermTemplatesGet))
+		g.GET("/api/templates/:id/preview", pm(hasID(a.owned(core.EntityTemplate, a.PreviewTemplate)), auth.PermTemplatesGet))
 		g.POST("/api/templates/preview", pm(a.PreviewTemplateBody, auth.PermTemplatesGet))
 		g.POST("/api/templates", pm(a.CreateTemplate, auth.PermTemplatesManage))
-		g.PUT("/api/templates/:id", pm(hasID(a.UpdateTemplate), auth.PermTemplatesManage))
-		g.PUT("/api/templates/:id/default", pm(hasID(a.TemplateSetDefault), auth.PermTemplatesManage))
-		g.DELETE("/api/templates/:id", pm(hasID(a.DeleteTemplate), auth.PermTemplatesManage))
+		g.PUT("/api/templates/:id", pm(hasID(a.owned(core.EntityTemplate, a.UpdateTemplate)), auth.PermTemplatesManage))
+		g.PUT("/api/templates/:id/default", pm(hasID(a.owned(core.EntityTemplate, a.TemplateSetDefault)), auth.PermTemplatesManage))
+		g.DELETE("/api/templates/:id", pm(hasID(a.owned(core.EntityTemplate, a.DeleteTemplate)), auth.PermTemplatesManage))
 
 		g.DELETE("/api/maintenance/subscribers/:type", pm(a.GCSubscribers, auth.PermSettingsMaintain))
 		g.DELETE("/api/maintenance/analytics/:type", pm(a.GCCampaignAnalytics, auth.PermSettingsMaintain))
@@ -444,7 +445,7 @@ func (a *App) hasSub(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		subUUID := c.Param("subUUID")
 
-		if _, err := a.core.GetSubscriber(0, subUUID, ""); err != nil {
+		if _, err := a.core.GetSubscriber(0, subUUID, "", 0); err != nil {
 			if er, ok := err.(*echo.HTTPError); ok && er.Code == http.StatusBadRequest {
 				return c.Render(http.StatusNotFound, tplMessage,
 					makeMsgTpl(a.i18n.T("globals.terms.notFound"), "", er.Message))

@@ -60,7 +60,7 @@ func (a *App) ViewTemplates(c *echo.Context) error {
 	q := makeQuery(c.Request().URL.Query(), templatesQueryDefaults)
 	typ := q.Get("type")
 
-	out, err := a.core.GetTemplates(q.Get("query"), typ, true, q.Get("order_by"), q.Get("order"))
+	out, err := a.core.GetTemplates(q.Get("query"), typ, true, q.Get("order_by"), q.Get("order"), projectID(c))
 	if err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func (a *App) GetTemplates(c *echo.Context) error {
 	noBody, _ := strconv.ParseBool(c.QueryParam("no_body"))
 
 	// Fetch templates from the DB.
-	out, err := a.core.GetTemplates(c.QueryParam("query"), "", noBody, c.QueryParam("order_by"), c.QueryParam("order"))
+	out, err := a.core.GetTemplates(c.QueryParam("query"), "", noBody, c.QueryParam("order_by"), c.QueryParam("order"), projectID(c))
 	if err != nil {
 		return err
 	}
@@ -205,7 +205,7 @@ func (a *App) CreateTemplate(c *echo.Context) error {
 	}
 
 	// Create the template the in the DB.
-	out, err := a.core.CreateTemplate(o.Name, o.Type, o.Subject, []byte(o.Body), o.BodySource)
+	out, err := a.core.CreateTemplate(o.Name, o.Type, o.Subject, []byte(o.Body), o.BodySource, projectID(c))
 	if err != nil {
 		return err
 	}
