@@ -50,7 +50,7 @@ Coolify : [défi DNS](https://coolify.io/docs/core/networking/proxy/traefik/dns-
 ## 3. Créer la ressource
 
 1. **Projects › votre projet › + New › Private Repository (GitHub App)**, dépôt `Youzoune/listmonk`, branche
-   `master` (ou la branche à tester).
+   `main` (ou la branche à tester).
 2. **Build Pack : Docker Compose**, **Docker Compose Location : `/docker-compose.relais.yml`**.
 3. Dans **Domains**, service `relais` : `https://mailing.youzoune.com`.
 4. Dans **Environment Variables** :
