@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, query } from './client';
 import type {
   Campaign, CampaignStatus, DashboardCharts, DashboardCounts, List, NewCampaign, Page, Profile, Project,
-  ProjectInput, Relay, RelayInput, ServerConfig, Settings, Subscriber, User,
+  ProjectInput, Relay, RelayInput, ServerConfig, Settings, SmtpServer, Subscriber, User,
 } from './types';
 
 // Query keys start with the project so that switching project refetches everything.
@@ -62,6 +62,41 @@ export function useSubscribers(project: number | null, opts: { search?: string; 
 
 export function useSettings(enabled: boolean) {
   return useQuery({ queryKey: ['settings'], queryFn: () => api<Settings>('/api/settings'), enabled });
+}
+
+// Waits for the server to answer again after it reloaded its settings.
+export async function waitForReload(timeoutMs = 20_000) {
+  await new Promise((r) => setTimeout(r, 800));
+  const end = Date.now() + timeoutMs;
+  while (Date.now() < end) {
+    try {
+      const res = await fetch('/api/health', { credentials: 'same-origin' });
+      if (res.ok) return;
+    } catch { /* restarting */ }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
+
+// Saves the whole settings object. The server reloads to apply it, unless
+// campaigns are sending (needs_restart).
+export function useSaveSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (settings: Settings) => {
+      const out = await api<true | { needs_restart: boolean }>('/api/settings', { method: 'PUT', json: settings });
+      await waitForReload();
+      return out;
+    },
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+// Sends a test e-mail through an SMTP server, saved or not.
+export function useTestSmtp() {
+  return useMutation({
+    mutationFn: ({ server, email }: { server: SmtpServer; email: string }) =>
+      api<string[]>('/api/settings/smtp/test', { method: 'POST', json: { ...server, email } }),
+  });
 }
 
 export function useCreateCampaign(project: number | null) {

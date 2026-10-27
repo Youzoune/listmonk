@@ -228,9 +228,13 @@ func (a *App) UpdateSettings(c *echo.Context) error {
 		// password by matching the UUID.
 		if s.Password == "" {
 			for _, c := range cur.SMTP {
-				if s.UUID == c.UUID {
+				if s.UUID != "" && s.UUID == c.UUID {
 					set.SMTP[i].Password = c.Password
 				}
+			}
+			// Servers saved without a UUID (the installer's defaults) match by position.
+			if s.UUID == "" && i < len(cur.SMTP) && cur.SMTP[i].UUID == "" {
+				set.SMTP[i].Password = cur.SMTP[i].Password
 			}
 		}
 	}
@@ -534,6 +538,22 @@ func (a *App) TestSMTPSettings(c *echo.Context) error {
 	to := ko.String("email")
 	if to == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, a.i18n.Ts("globals.messages.missingFields", "name", "email"))
+	}
+
+	// A saved server can be tested without typing its password again: an empty
+	// password is the saved one (the settings GET never sends it).
+	if req.Password == "" {
+		if uu := ko.String("uuid"); uu != "" {
+			cur, err := a.core.GetSettings()
+			if err != nil {
+				return err
+			}
+			for _, s := range cur.SMTP {
+				if s.UUID == uu {
+					req.Password = s.Password
+				}
+			}
+		}
 	}
 
 	// Initialize a new SMTP pool.

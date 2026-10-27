@@ -9,6 +9,7 @@ const NAV: { to: string; label: string; icon: IconName; perms?: string[] }[] = [
   { to: '/audience', label: 'Audience', icon: 'users', perms: ['subscribers:get_all', 'subscribers:get'] },
   { to: '/relais', label: 'Relais d’envoi', icon: 'relay', perms: ['settings:get'] },
   { to: '/projets', label: 'Projets', icon: 'layers', perms: ['projects:get', 'projects:manage'] },
+  { to: '/reglages', label: 'Réglages', icon: 'gear', perms: ['settings:get'] },
 ];
 
 function ProjectSwitcher() {

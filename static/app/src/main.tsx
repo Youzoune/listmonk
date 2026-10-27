@@ -18,6 +18,7 @@ import { NewCampaign } from './views/NewCampaign';
 import { ProjectEdit } from './views/ProjectEdit';
 import { Projects } from './views/Projects';
 import { Relays } from './views/Relays';
+import { Settings } from './views/Settings';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,6 +53,7 @@ const router = createBrowserRouter(
         { path: 'projets', element: <Projects /> },
         { path: 'projets/nouveau', element: <ProjectEdit /> },
         { path: 'projets/:id', element: <ProjectEdit /> },
+        { path: 'reglages', element: <Settings /> },
         { path: 'guide', element: <Guide /> },
         { path: 'marque', element: <Brand /> },
         { path: '*', element: <NotFound /> },

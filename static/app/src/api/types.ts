@@ -31,6 +31,8 @@ export interface Profile {
 
 export interface ServerConfig {
   root_url: string;
+  // The root URL comes from the server's environment (Coolify) and can't be changed here.
+  root_url_locked?: boolean;
   // Base domain of the projects' subdomains, "" if none.
   projects_domain?: string;
   from_email: string;
@@ -103,21 +105,60 @@ export interface SmtpServer {
   name: string;
   enabled: boolean;
   host: string;
+  hello_hostname: string;
   port: number;
+  auth_protocol: 'none' | 'plain' | 'login' | 'cram';
   username: string;
+  // Never sent back by the server: empty keeps the saved password.
+  password?: string;
+  email_headers: Record<string, string>[];
   max_conns: number;
-  tls_type: string;
-  exclude_from_default: boolean;
+  max_msg_retries: number;
+  msg_retry_delay: string;
+  idle_timeout: string;
+  wait_timeout: string;
+  tls_type: 'none' | 'STARTTLS' | 'TLS';
+  tls_skip_verify: boolean;
   from_addresses: string[];
+  exclude_from_default: boolean;
+  project_id: number;
+  cadence: RelayCadence;
+  warmup: RelayWarmup;
+  // Client only: added on this screen and not saved yet.
+  _new?: boolean;
 }
 
+// The instance settings, as GET /api/settings returns them and PUT takes them
+// back whole. Only the keys the screens use are typed.
 export interface Settings {
   smtp: SmtpServer[];
+  'app.site_name': string;
+  'app.root_url': string;
+  'app.logo_url': string;
+  'app.favicon_url': string;
+  'app.from_email': string[];
+  'app.notify_emails': string[];
+  'app.lang': string;
+  'app.enable_public_subscription_page': boolean;
+  'app.enable_public_archive': boolean;
+  'app.send_optin_confirmation': boolean;
+  'app.check_updates': boolean;
+  'app.batch_size': number;
   'app.concurrency': number;
+  'app.max_send_errors': number;
   'app.message_rate': number;
   'app.message_sliding_window': boolean;
   'app.message_sliding_window_duration': string;
   'app.message_sliding_window_rate': number;
+  'privacy.individual_tracking': boolean;
+  'privacy.disable_tracking': boolean;
+  'privacy.unsubscribe_header': boolean;
+  'privacy.allow_blocklist': boolean;
+  'privacy.allow_preferences': boolean;
+  'privacy.allow_export': boolean;
+  'privacy.allow_wipe': boolean;
+  'privacy.record_optin_ip': boolean;
+  [key: string]: unknown;
 }
 
 export interface NewCampaign {

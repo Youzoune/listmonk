@@ -493,6 +493,10 @@ func initSettings(query string, db *sqlx.DB, ko *koanf.Koanf) {
 	}
 }
 
+// rootURLFromEnv tells that the root URL comes from the environment, so the
+// settings screens show it read-only.
+var rootURLFromEnv bool
+
 // applyEnvRootURL makes the root URL from the environment the app's root URL,
 // and saves it in the settings so that the settings page shows it.
 func applyEnvRootURL(root string, db *sqlx.DB, ko *koanf.Koanf) {

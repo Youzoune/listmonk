@@ -40,12 +40,16 @@ type serverConfig struct {
 
 	// Base domain of the projects' subdomains ("" if none).
 	ProjectsDomain string `json:"projects_domain"`
+
+	// The root URL is set by the environment and can't be changed in the settings.
+	RootURLLocked bool `json:"root_url_locked"`
 }
 
 func (a *App) makeServerConfig() (serverConfig, error) {
 	out := serverConfig{
 		RootURL:        a.urlCfg.RootURL,
 		ProjectsDomain: a.projects.BaseDomain(),
+		RootURLLocked:  rootURLFromEnv,
 		FromEmail:      a.cfg.FromEmail,
 		FromEmails:     a.cfg.FromEmails,
 		Lang:           a.cfg.Lang,
