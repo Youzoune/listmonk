@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet } from 'react-router';
+import { Link, NavLink, Outlet } from 'react-router';
 import { useProject } from '../project';
 import { Icon, Logo, ProjectBadge, type IconName } from './ui';
 
@@ -8,10 +8,11 @@ const NAV: { to: string; label: string; icon: IconName; perms?: string[] }[] = [
   { to: '/campagnes', label: 'Campagnes', icon: 'send', perms: ['campaigns:get_all', 'campaigns:get'] },
   { to: '/audience', label: 'Audience', icon: 'users', perms: ['subscribers:get_all', 'subscribers:get'] },
   { to: '/relais', label: 'Relais d’envoi', icon: 'relay', perms: ['settings:get'] },
+  { to: '/projets', label: 'Projets', icon: 'layers', perms: ['projects:get', 'projects:manage'] },
 ];
 
 function ProjectSwitcher() {
-  const { projects, project, setProject } = useProject();
+  const { projects, project, setProject, can } = useProject();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -52,6 +53,14 @@ function ProjectSwitcher() {
               </button>
             </li>
           ))}
+          {can('projects:get', 'projects:manage') && (
+            <li className="switcher-foot">
+              <Link to="/projets" onClick={() => setOpen(false)}>Tous les projets</Link>
+              {can('projects:manage') && (
+                <Link to="/projets/nouveau" onClick={() => setOpen(false)}><Icon name="plus" size={15} /> Créer un projet</Link>
+              )}
+            </li>
+          )}
         </ul>
       )}
     </div>

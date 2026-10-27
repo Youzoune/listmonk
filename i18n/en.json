@@ -425,7 +425,7 @@
     "projects.invalidDomain": "Invalid domain. Use a hostname such as newsletter.example.com.",
     "projects.invalidSlug": "Invalid slug. Use lowercase letters, digits and dashes (max. 64 characters).",
     "projects.listsAcrossProjects": "Lists must all belong to the same project.",
-    "projects.notEmpty": "The project still has lists, subscribers, campaigns, templates or media. Delete them first.",
+    "projects.notEmpty": "The project still has lists, subscribers, campaigns or media. Delete them first.",
     "projects.slugExists": "Another project already uses this slug.",
     "public.archiveEmpty": "No archived messages yet.",
     "public.archiveTitle": "Mailing list archive",

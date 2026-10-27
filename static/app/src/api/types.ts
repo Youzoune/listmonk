@@ -129,3 +129,20 @@ export interface NewCampaign {
   tags: string[];
   send_at?: string | null;
 }
+
+export interface User {
+  id: number;
+  username: string;
+  name: string;
+  email: string | null;
+  type: 'user' | 'api';
+  status: 'enabled' | 'disabled';
+  user_role: { id: number; name: string; permissions: string[] };
+}
+
+export interface ProjectInput {
+  name: string;
+  slug: string;
+  domain: string | null;
+  description: string;
+}
