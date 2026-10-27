@@ -112,7 +112,7 @@ function SmtpEditor({ server, all, onChange, onRemove, canEdit }:
     <section className="panel relay-detail smtp-editor">
       <div className="relay-detail-head">
         <div>
-          <h2>{shownName || 'Nouveau serveur'}</h2>
+          <h2>{shownName || server.host || 'Nouveau serveur'}</h2>
           <p className="sub mono">{server.host ? `${server.host}:${server.port}` : 'Pas encore d’hôte'}</p>
         </div>
         <div className="row-gap">

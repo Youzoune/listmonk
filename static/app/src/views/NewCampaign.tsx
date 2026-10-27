@@ -232,7 +232,7 @@ export function NewCampaign() {
                 <input id="name" type="text" value={name} placeholder={subject} onChange={(e) => setName(e.target.value)} />
               </Field>
               <ul className="checklist">
-                <li><Icon name="check" size={16} /> {num(count)} contacts dans {chosen.length} liste{chosen.length > 1 ? 's' : ''}</li>
+                <li><Icon name="check" size={16} /> {num(count)} contact{count > 1 ? 's' : ''} dans {chosen.length} liste{chosen.length > 1 ? 's' : ''}</li>
                 <li><Icon name="check" size={16} /> Envoi par {relayLabel(messenger)}, signé {senderName(sender)}</li>
                 <li><Icon name="check" size={16} /> {start === 'now' ? 'Départ immédiat' : start === 'scheduled' ? `Départ le ${new Date(sendAt).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' })}` : 'Reste en brouillon'}</li>
                 {estimate?.end && start !== 'draft' && <li><Icon name="clock" size={16} /> Fin estimée {fmtEnd(estimate.end)}, sur {estimate.days} jour{estimate.days > 1 ? 's' : ''} d’envoi</li>}

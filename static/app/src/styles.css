@@ -248,7 +248,7 @@ a.btn-dark { color: var(--bg); }
 .choice-body { flex: 1; min-width: 0; }
 .field { display: grid; gap: 6px; }
 .field label { font-weight: 600; font-size: .9rem; }
-.field input[type="text"], .field textarea, .input-unit {
+.field input[type="text"], .field input[type="email"], .field input[type="password"], .field input[type="url"], .field input[type="date"], .field textarea, .input-unit {
   width: 100%; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); padding: 10px 12px; min-height: 44px;
 }
 .field textarea { resize: vertical; line-height: 1.6; }
@@ -314,6 +314,12 @@ a.btn-dark { color: var(--bg); }
 .chart .bar { fill: var(--line); }
 .chart .bar-past { fill: var(--muted); }
 .chart .bar-today { fill: var(--brand); stroke: var(--fg); stroke-width: 1.5; }
+
+/* Forms inside panels: two fields side by side as soon as they fit. */
+.relay-detail .grid-2, .settings-panel .grid-2, .tpl-form .grid-2, .list-form .grid-2, .panel > .grid-2:not(.align-start) {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; align-items: start;
+}
+.field input[type="file"] { padding: 8px 0; }
 
 /* Explanations and presets */
 .explain { border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-2, var(--bg)); }
@@ -511,3 +517,4 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 .field select:disabled, .field input:disabled { opacity: .7; }
 .field-num .input-unit { min-height: 44px; }
 .boot { padding: 48px 24px; color: var(--muted); text-align: center; }
+.self-start { align-self: flex-start; }

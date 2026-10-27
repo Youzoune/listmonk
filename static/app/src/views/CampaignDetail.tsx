@@ -9,7 +9,7 @@ import type { AnalyticsCount, Campaign } from '../api/types';
 import { CampaignChip, ErrorState, Explain, Field, Icon, Loading, Progress } from '../components/ui';
 import { campaignHTMLToText, textToCampaignHTML } from '../lib/body';
 import { ACTIONS, ACTION_LABEL, ACTION_STATUS, analyticsRange, isEditable, rate, type CampaignAction } from '../lib/campaigns';
-import { dateTime, num, relayLabel } from '../lib/format';
+import { count, dateTime, num, relayLabel } from '../lib/format';
 import { fromTemplate, toTemplate } from '../lib/variables';
 import { useProject } from '../project';
 
@@ -185,9 +185,9 @@ export function CampaignDetail() {
       <dl className="kpis panel">
         <div><dt>Destinataires</dt><dd className="num">{num(c.to_send)}</dd></div>
         <div><dt>Envoyés</dt><dd className="num">{num(c.sent)}</dd></div>
-        <div><dt>Ouvertures</dt><dd className="num">{num(c.views)} <span className="sub">{rate(c.views, c.sent)}</span></dd></div>
-        <div><dt>Clics</dt><dd className="num">{num(c.clicks)} <span className="sub">{rate(c.clicks, c.sent)}</span></dd></div>
-        <div><dt>Rebonds</dt><dd className="num">{num(c.bounces)} <span className="sub">{rate(c.bounces, c.sent)}</span></dd></div>
+        <div><dt>Ouvertures</dt><dd className="num">{num(c.views)} {c.sent > 0 && <span className="sub">{rate(c.views, c.sent)}</span>}</dd></div>
+        <div><dt>Clics</dt><dd className="num">{num(c.clicks)} {c.sent > 0 && <span className="sub">{rate(c.clicks, c.sent)}</span>}</dd></div>
+        <div><dt>Rebonds</dt><dd className="num">{num(c.bounces)} {c.sent > 0 && <span className="sub">{rate(c.bounces, c.sent)}</span>}</dd></div>
       </dl>
       {(c.status === 'running' || c.status === 'paused') && <Progress value={c.sent} max={Math.max(c.to_send, 1)} label="Avancement de l’envoi" />}
 
@@ -246,7 +246,7 @@ export function CampaignDetail() {
                   <label className="switch" htmlFor={`c-list-${l.id}`}>
                     <input id={`c-list-${l.id}`} type="checkbox" checked={draft.lists.includes(l.id)}
                       onChange={(e) => setDraft({ ...draft, lists: e.target.checked ? [...draft.lists, l.id] : draft.lists.filter((x) => x !== l.id) })} />
-                    <span>{l.name} <span className="sub num">{num(l.subscriber_count)} contacts</span></span>
+                    <span>{l.name} <span className="sub num">{count(l.subscriber_count, 'contact')}</span></span>
                   </label>
                 </li>
               ))}
@@ -305,7 +305,7 @@ export function CampaignDetail() {
               <button type="button" className="btn btn-danger" disabled={del.isPending} onClick={() => del.mutate(c.id, { onSuccess: () => navigate('/campagnes') })}>Supprimer définitivement</button>
               <button type="button" className="btn btn-ghost" onClick={() => setConfirmDelete(false)}>Annuler</button>
             </div>
-          ) : <button type="button" className="btn" onClick={() => setConfirmDelete(true)}>Supprimer la campagne…</button>}
+          ) : <button type="button" className="btn self-start" onClick={() => setConfirmDelete(true)}>Supprimer la campagne…</button>}
         </section>
       )}
     </div>
