@@ -27,6 +27,8 @@ export interface Profile {
   email: string | null;
   type: 'user' | 'api';
   user_role: { id: number; name: string; permissions: string[] };
+  password_login?: boolean;
+  twofa_type?: 'none' | 'totp' | '';
 }
 
 export interface ServerConfig {

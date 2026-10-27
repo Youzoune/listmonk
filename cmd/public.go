@@ -25,6 +25,9 @@ import (
 
 const (
 	tplMessage = "message"
+
+	// tplAuthMessage is a message in the layout of the sign-in pages.
+	tplAuthMessage = "admin-message"
 )
 
 // pubTplRenderer wraps public templates for echo.

@@ -174,7 +174,7 @@ function RelayEditor({ relay }: { relay: Relay }) {
       {relay.pool ? (
         <p className="note">
           Le relais par défaut répartit les envois sur les serveurs SMTP partagés. Il suit la cadence globale de l’instance.
-          Pour régler une cadence ou un warm-up, donnez un nom au serveur dans l’ancienne interface et choisissez-le dans la campagne.
+          Pour régler une cadence ou un warm-up, donnez un nom au serveur dans Réglages › Serveurs SMTP : il devient un relais à part.
         </p>
       ) : (
         <>
@@ -301,7 +301,7 @@ function RelayEditor({ relay }: { relay: Relay }) {
           )}
           {canEdit && (
             <div className="row-gap end">
-              <a className="btn" href="/admin/settings">Serveur et identifiants</a>
+              <Link className="btn" to="/reglages?onglet=smtp">Serveur et identifiants</Link>
               <button type="button" className="btn btn-dark" disabled={save.isPending} onClick={submit}>
                 {save.isPending ? 'Enregistrement…' : 'Enregistrer'}
               </button>

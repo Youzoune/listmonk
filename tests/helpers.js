@@ -9,7 +9,7 @@ const CONFIG = process.env.LISTMONK_CONFIG || process.env.DEV_CONFIG || 'config.
 const AUTH_FILE = new URL('.auth/admin.json', import.meta.url).pathname;
 // Projects get <slug>.relais.localhost, which Chromium resolves to this machine.
 export const PROJECTS_DOMAIN = process.env.LISTMONK_projects__domain || 'relais.localhost';
-const ENV = { ...process.env, LISTMONK_ADMIN_USER: 'admin', LISTMONK_ADMIN_PASSWORD: 'listmonk', LISTMONK_projects__domain: PROJECTS_DOMAIN };
+const ENV = { ...process.env, LISTMONK_ADMIN_USER: 'admin', LISTMONK_ADMIN_PASSWORD: 'listmonk', LISTMONK_relais__legacy_admin: 'true', LISTMONK_projects__domain: PROJECTS_DOMAIN };
 
 // A single SMTP server pointing at MailHog so tests capture (and can assert on) mail.
 const MAILHOG_SMTP = JSON.stringify([{
@@ -43,9 +43,9 @@ export async function selectList(scope, name) {
 export async function login(context) {
   const page = await context.newPage();
   await page.goto(`${BASE_URL}/admin/login?next=/admin/lists`);
-  await page.getByLabel('Username').fill('admin');
-  await page.getByLabel('Password').fill('listmonk');
-  await page.getByRole('button', { name: 'Login' }).click();
+  await page.getByLabel('Identifiant').fill('admin');
+  await page.getByLabel('Mot de passe').fill('listmonk');
+  await page.getByRole('button', { name: 'Se connecter' }).click();
   await page.waitForURL('**/admin/lists');
   await context.storageState({ path: AUTH_FILE });
   await page.close();
@@ -133,7 +133,7 @@ export async function resetDB(browser, { bounces = false } = {}) {
 export async function resetDBBlank() {
   try { execSync('pkill -9 listmonk', { stdio: 'ignore' }); } catch { /* none running */ }
 
-  const env = { ...process.env };
+  const env = { ...process.env, LISTMONK_relais__legacy_admin: 'true' };
   delete env.LISTMONK_ADMIN_USER;
   delete env.LISTMONK_ADMIN_PASSWORD;
 

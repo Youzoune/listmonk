@@ -1,0 +1,42 @@
+{{- /* Layout of the Relais sign-in pages (login, 2FA, password reset, first account). */ -}}
+{{ define "auth-header" }}
+<!doctype html>
+<html lang="fr">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+	<meta name="robots" content="noindex" />
+	<title>{{ .Data.Title }} · Relais</title>
+	<link href="/public/static/relais/auth.css?v={{ .AssetVersion }}" rel="stylesheet" type="text/css" />
+	<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23FFC629'/%3E%3Crect x='7' y='18' width='3.6' height='7' rx='1.8' fill='%2314171A'/%3E%3Crect x='12.4' y='14' width='3.6' height='11' rx='1.8' fill='%2314171A'/%3E%3Crect x='17.8' y='10' width='3.6' height='15' rx='1.8' fill='%2314171A'/%3E%3C/svg%3E" />
+</head>
+<body>
+	<main class="auth">
+		<a class="auth-logo" href="/app" aria-label="Relais">
+			<svg width="36" height="36" viewBox="0 0 32 32" aria-hidden="true">
+				<rect width="32" height="32" rx="9" fill="#FFC629" />
+				<rect x="7" y="18" width="3.6" height="7" rx="1.8" fill="#14171A" />
+				<rect x="12.4" y="14" width="3.6" height="11" rx="1.8" fill="#14171A" />
+				<rect x="17.8" y="10" width="3.6" height="15" rx="1.8" fill="#14171A" />
+				<path d="M23.2 7.5h3.3v3.3M26.5 7.5 21.6 12.4" fill="none" stroke="#14171A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+			</svg>
+			<span>relais</span>
+		</a>
+		<section class="card">
+{{ end }}
+
+{{ define "auth-footer" }}
+		</section>
+		<p class="foot">{{ .SiteName }}</p>
+	</main>
+</body>
+</html>
+{{ end }}
+
+{{ define "admin-message" }}
+{{ template "auth-header" . }}
+	<h1>{{ .Data.Title }}</h1>
+	<p>{{ .Data.Message }}</p>
+	<a class="btn btn-outline" href="/admin/login">Retour à la connexion</a>
+{{ template "auth-footer" . }}
+{{ end }}

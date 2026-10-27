@@ -1,37 +1,30 @@
 {{ define "admin-login-setup" }}
-{{ template "header" .}}
+{{ template "auth-header" . }}
+	<h1>Bienvenue sur Relais</h1>
+	<p class="lead">Créez le premier compte : il aura tous les droits sur l’instance.</p>
 
-<section class="login">
-	<h2>{{ .L.T "users.newUser"}}</h2>
-	<p> {{ .L.T "users.firstTime" }}</p>
+	{{ if .Data.Error }}<p class="error" role="alert">{{ .Data.Error }}</p>{{ end }}
 
-	<form method="post" action="" class="form">
-		<div>
-			<input type="hidden" name="nonce" value="{{ .Data.Nonce }}" />
-			<input type="hidden" name="next" value="{{ .Data.NextURI }}" />
-			<p>
-				<label for="email">{{ .L.T "globals.fields.email" }}</label>
-				<input id="email" type="email" name="email" autofocus required minlength="3" />
-			</p>
-			<p>
-				<label for="username">{{ .L.T "globals.fields.username" }}</label>
-				<input id="username" type="text" name="username" required minlength="3" />
-			</p>
-			<p>
-				<label for="password">{{ .L.T "globals.fields.password" }}</label>
-				<input id="password" type="password" name="password" required minlength="8" />
-			</p>
-			<p>
-				<label for="password2">{{ .L.T "globals.fields.passwordRepeat" }}</label>
-				<input id="password2" type="password" name="password2" required minlength="8" />
-			</p>
-
-			{{ if .Data.Error }}<p><span class="error">{{ .Data.Error }}</span></p>{{ end }}
-
-			<p class="submit"><button class="button" type="submit">{{ .L.T "globals.buttons.continue" }}</button></p>
+	<form method="post" action="">
+		<input type="hidden" name="nonce" value="{{ .Data.Nonce }}" />
+		<input type="hidden" name="next" value="{{ .Data.NextURI }}" />
+		<div class="field">
+			<label for="email">Adresse e-mail</label>
+			<input id="email" type="email" name="email" autocomplete="email" autofocus required minlength="3" />
 		</div>
+		<div class="field">
+			<label for="username">Identifiant</label>
+			<input id="username" type="text" name="username" autocomplete="username" required minlength="3" />
+		</div>
+		<div class="field">
+			<label for="password">Mot de passe</label>
+			<input id="password" type="password" name="password" autocomplete="new-password" required minlength="8" />
+		</div>
+		<div class="field">
+			<label for="password2">Répétez le mot de passe</label>
+			<input id="password2" type="password" name="password2" autocomplete="new-password" required minlength="8" />
+		</div>
+		<button class="btn btn-primary" type="submit">Créer le compte</button>
 	</form>
-</section>
-
-{{ template "footer" .}}
+{{ template "auth-footer" . }}
 {{ end }}

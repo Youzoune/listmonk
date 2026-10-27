@@ -1,45 +1,38 @@
 {{ define "admin-login" }}
-{{ template "header" .}}
+{{ template "auth-header" . }}
+	<h1>Connexion</h1>
 
-<section class="login">
-	<h2>{{ .L.T "globals.buttons.login"}}</h2>
-	{{ if .Data.PasswordEnabled }}
-	<form method="post" action="/admin/login" class="form">
-		<div>
-			<input type="hidden" name="nonce" value="{{ .Data.Nonce }}" />
-			<input type="hidden" name="next" value="{{ .Data.NextURI }}" />
-			<p>
-				<label for="username">{{ .L.T "globals.fields.username" }}</label>
-				<input id="username" type="text" name="username" autofocus required minlength="3" />
-			</p>
-			<p>
-				<label for="password">{{ .L.T "globals.fields.password" }}</label>
-				<input id="password" type="password" name="password" required minlength="8" />
-			</p>
+	{{ if .Data.Error }}<p class="error" role="alert">{{ .Data.Error }}</p>{{ end }}
 
-			{{ if .Data.Error }}<p><span class="error">{{ .Data.Error }}</span></p>{{ end }}
-
-			<p class="submit"><button class="button" type="submit">{{ .L.T "globals.buttons.login" }}</button></p>
-		</div>
-	</form>
-	{{ end }}
-	
 	{{ if .Data.OIDCProvider }}
 	<form method="post" action="/auth/oidc">
-		<div>
-			<input type="hidden" name="nonce" value="{{ .Data.Nonce }}" />
-			<input type="hidden" name="next" value="{{ .Data.NextURI }}" />
-			<p><button class="button button-outline" type="submit">
-				<img src="{{ .RootURL }}/public/static/auth/{{ .Data.OIDCProviderLogo }}" alt="" />
-				{{ .L.Ts "users.loginOIDC" "name" .Data.OIDCProvider }}
-			</button></p>
-		</div>
+		<input type="hidden" name="nonce" value="{{ .Data.Nonce }}" />
+		<input type="hidden" name="next" value="{{ .Data.NextURI }}" />
+		<button class="btn btn-outline" type="submit">
+			<img src="{{ .RootURL }}/public/static/auth/{{ .Data.OIDCProviderLogo }}" alt="" />
+			Se connecter avec {{ .Data.OIDCProvider }}
+		</button>
 	</form>
+	{{ if .Data.PasswordEnabled }}<p class="or">ou</p>{{ end }}
 	{{ end }}
 
-	<p class="center small"><a href="{{ .RootURL }}/admin/forgot">{{ .L.T "users.forgotPassword" }}</a></p>
-
-</section>
-
-{{ template "footer" .}}
+	{{ if .Data.PasswordEnabled }}
+	<form method="post" action="/admin/login">
+		<input type="hidden" name="nonce" value="{{ .Data.Nonce }}" />
+		<input type="hidden" name="next" value="{{ .Data.NextURI }}" />
+		<div class="field">
+			<label for="username">Identifiant</label>
+			<input id="username" type="text" name="username" autocomplete="username" autofocus required minlength="3" />
+		</div>
+		<div class="field">
+			<div class="field-head">
+				<label for="password">Mot de passe</label>
+				<a class="small muted" href="{{ .RootURL }}/admin/forgot">Mot de passe oublié ?</a>
+			</div>
+			<input id="password" type="password" name="password" autocomplete="current-password" required minlength="8" />
+		</div>
+		<button class="btn btn-primary" type="submit">Se connecter</button>
+	</form>
+	{{ end }}
+{{ template "auth-footer" . }}
 {{ end }}

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router';
+import { logout } from '../api/hooks';
 import { useProject } from '../project';
 import { Icon, Logo, ProjectBadge, type IconName } from './ui';
 
@@ -93,15 +94,17 @@ export function Shell() {
         <div className="side-foot">
           <NavLink to="/guide"><Icon name="book" /> <span>Guide de l’envoi</span></NavLink>
           <NavLink to="/marque"><Icon name="brand" /> <span>Identité Relais</span></NavLink>
-          <a href="/admin">
-            <Icon name="out" /> <span>Ancienne interface</span>
-          </a>
           <div className="me">
-            <span className="avatar" aria-hidden="true">{name.slice(0, 2).toUpperCase()}</span>
-            <span className="switcher-text">
-              <span className="strong">{name}</span>
-              <span className="sub">{profile?.user_role.name}</span>
-            </span>
+            <NavLink to="/compte" className="me-link" aria-label={`Mon compte (${name})`}>
+              <span className="avatar" aria-hidden="true">{name.slice(0, 2).toUpperCase()}</span>
+              <span className="switcher-text">
+                <span className="strong">{name}</span>
+                <span className="sub">{profile?.user_role.name}</span>
+              </span>
+            </NavLink>
+            <button type="button" className="btn btn-sm btn-ghost me-out" aria-label="Se déconnecter" title="Se déconnecter" onClick={() => logout()}>
+              <Icon name="out" size={16} />
+            </button>
           </div>
         </div>
       </aside>

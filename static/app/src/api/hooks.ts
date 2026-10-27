@@ -12,6 +12,48 @@ export function useProfile() {
   return useQuery({ queryKey: ['profile'], queryFn: () => api<Profile>('/api/profile'), staleTime: 5 * 60_000 });
 }
 
+export function useUpdateProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (p: { name: string; email: string; password?: string }) => api<Profile>('/api/profile', { method: 'PUT', json: p }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['profile'] }),
+  });
+}
+
+// TOTP two-factor authentication of the signed-in user.
+export function useTotpSetup(userId: number | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ['totp', userId],
+    queryFn: () => api<{ secret: string; qr: string }>(`/api/users/${userId}/twofa/totp`),
+    enabled: enabled && !!userId,
+    staleTime: Infinity,
+  });
+}
+
+export function useTotp(userId: number | undefined) {
+  const qc = useQueryClient();
+  const done = () => { qc.invalidateQueries({ queryKey: ['profile'] }); qc.removeQueries({ queryKey: ['totp'] }); };
+  const enable = useMutation({
+    mutationFn: (b: { secret: string; code: string }) => api<boolean>(`/api/users/${userId}/twofa`, { method: 'PUT', json: b }),
+    onSuccess: done,
+  });
+  const disable = useMutation({
+    mutationFn: (password: string) => api<boolean>(`/api/users/${userId}/twofa`, { method: 'DELETE', json: { password } }),
+    onSuccess: done,
+  });
+  return { enable, disable };
+}
+
+export async function logout() {
+  let next = '/admin/login';
+  try {
+    const r = await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
+    const b = await r.json() as { redirect_url?: string | null };
+    if (b.redirect_url) next = b.redirect_url;
+  } catch { /* the session is gone or the server is down: the login page says which */ }
+  window.location.assign(next);
+}
+
 export function useProjects(enabled: boolean) {
   return useQuery({ queryKey: ['projects'], queryFn: () => api<Project[]>('/api/projects'), enabled, staleTime: 60_000 });
 }

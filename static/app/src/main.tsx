@@ -12,6 +12,7 @@ import { ProjectProvider } from './project';
 import { Audience } from './views/Audience';
 import { Bounces } from './views/Bounces';
 import { Maintenance } from './views/Maintenance';
+import { Account } from './views/Account';
 import { MediaLibrary } from './views/MediaLibrary';
 import { Users } from './views/Users';
 import { Brand } from './views/Brand';
@@ -69,6 +70,7 @@ const router = createBrowserRouter(
         { path: 'medias', element: <MediaLibrary /> },
         { path: 'equipe', element: <Users /> },
         { path: 'maintenance', element: <Maintenance /> },
+        { path: 'compte', element: <Account /> },
         { path: 'relais', element: <Relays /> },
         { path: 'projets', element: <Projects /> },
         { path: 'projets/nouveau', element: <ProjectEdit /> },

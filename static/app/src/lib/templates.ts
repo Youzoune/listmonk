@@ -10,7 +10,7 @@ export const hasContentTag = (body: string) => CONTENT_RE.test(body);
 
 export const TEMPLATE_TYPES: Record<TemplateType, { label: string; hint: string }> = {
   campaign: { label: 'Campagne', hint: 'L’habillage des campagnes : en-tête, pied de page, mise en forme. Le texte de la campagne vient à la place de la balise de contenu.' },
-  campaign_visual: { label: 'Campagne (éditeur visuel)', hint: 'Créé avec l’éditeur visuel de l’ancienne interface.' },
+  campaign_visual: { label: 'Campagne (éditeur visuel)', hint: 'Créé avec l’éditeur visuel par blocs : copiez-le en HTML pour le modifier ici.' },
   tx: { label: 'Transactionnel', hint: 'Un e-mail envoyé un par un par une autre application (confirmation de commande, mot de passe…) via l’API /api/tx.' },
 };
 

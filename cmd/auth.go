@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/knadh/listmonk/internal/appurls"
 	"github.com/knadh/listmonk/internal/auth"
 	"github.com/knadh/listmonk/internal/i18n"
 	"github.com/knadh/listmonk/internal/notifs"
@@ -350,18 +351,18 @@ func (a *App) ResetPage(c *echo.Context) error {
 	// Validate token and email (don't delete it yet, as we may need it for POST).
 	data, err := tmptokens.Check(email)
 	if err != nil {
-		return c.Render(http.StatusBadRequest, tplMessage, makeMsgTpl(a.i18n.T("users.resetPassword"), "", a.i18n.T("users.invalidResetLink")))
+		return c.Render(http.StatusBadRequest, tplAuthMessage, makeMsgTpl("Lien expiré", "", "Ce lien de réinitialisation n’est plus valable. Demandez-en un nouveau depuis « Mot de passe oublié ? »."))
 	}
 
 	tk, ok := data.(string)
 	if !ok || tk != token {
-		return c.Render(http.StatusBadRequest, tplMessage, makeMsgTpl(a.i18n.T("users.resetPassword"), "", a.i18n.T("users.invalidResetLink")))
+		return c.Render(http.StatusBadRequest, tplAuthMessage, makeMsgTpl("Lien expiré", "", "Ce lien de réinitialisation n’est plus valable. Demandez-en un nouveau depuis « Mot de passe oublié ? »."))
 	}
 
 	// Validate that the user exists.
 	_, err = a.core.GetUser(0, "", email)
 	if err != nil {
-		return c.Render(http.StatusBadRequest, tplMessage, makeMsgTpl(a.i18n.T("users.resetPassword"), "", a.i18n.T("users.invalidResetLink")))
+		return c.Render(http.StatusBadRequest, tplAuthMessage, makeMsgTpl("Lien expiré", "", "Ce lien de réinitialisation n’est plus valable. Demandez-en un nouveau depuis « Mot de passe oublié ? »."))
 	}
 
 	// Process the reset password request form with the new passwords.
@@ -649,18 +650,18 @@ func (a *App) doForgotPassword(c *echo.Context) error {
 
 	// Validate email format.
 	if !utils.ValidateEmail(email) {
-		return c.Render(http.StatusOK, tplMessage, makeMsgTpl(a.i18n.T("users.resetPassword"), "", a.i18n.T("users.resetLinkSent")))
+		return c.Render(http.StatusOK, tplAuthMessage, makeMsgTpl("Vérifiez vos e-mails", "", "Si un compte existe avec cette adresse, un lien pour choisir un nouveau mot de passe vient de lui être envoyé."))
 	}
 
 	// Get the user by email.
 	user, err := a.core.GetUser(0, "", email)
 	if err != nil {
-		return c.Render(http.StatusOK, tplMessage, makeMsgTpl(a.i18n.T("users.resetPassword"), "", a.i18n.T("users.resetLinkSent")))
+		return c.Render(http.StatusOK, tplAuthMessage, makeMsgTpl("Vérifiez vos e-mails", "", "Si un compte existe avec cette adresse, un lien pour choisir un nouveau mot de passe vient de lui être envoyé."))
 	}
 
 	// If the password login is disabled, do not proceed, but show success message to prevent email enumeration.
 	if !user.PasswordLogin {
-		return c.Render(http.StatusOK, tplMessage, makeMsgTpl(a.i18n.T("users.resetPassword"), "", a.i18n.T("users.resetLinkSent")))
+		return c.Render(http.StatusOK, tplAuthMessage, makeMsgTpl("Vérifiez vos e-mails", "", "Si un compte existe avec cette adresse, un lien pour choisir un nouveau mot de passe vient de lui être envoyé."))
 	}
 
 	// Generate a random token.
@@ -705,7 +706,7 @@ func (a *App) doForgotPassword(c *echo.Context) error {
 	}
 
 	// Show the success e-mail nonetheless to prevent e-mail enumeration.
-	return c.Render(http.StatusOK, tplMessage, makeMsgTpl(a.i18n.T("users.resetPassword"), "", a.i18n.T("users.resetLinkSent")))
+	return c.Render(http.StatusOK, tplAuthMessage, makeMsgTpl("Vérifiez vos e-mails", "", "Si un compte existe avec cette adresse, un lien pour choisir un nouveau mot de passe vient de lui être envoyé."))
 }
 
 // doResetPassword handles the reset password form submission.
@@ -726,23 +727,23 @@ func (a *App) doResetPassword(c *echo.Context, token, email string) error {
 	// Validate and consume the token (this deletes it).
 	data, err := tmptokens.Get(email)
 	if err != nil {
-		return c.Render(http.StatusBadRequest, tplMessage, makeMsgTpl(a.i18n.T("users.resetPassword"), "", a.i18n.T("users.invalidResetLink")))
+		return c.Render(http.StatusBadRequest, tplAuthMessage, makeMsgTpl("Lien expiré", "", "Ce lien de réinitialisation n’est plus valable. Demandez-en un nouveau depuis « Mot de passe oublié ? »."))
 	}
 
 	tk, ok := data.(string)
 	if !ok || tk != token {
-		return c.Render(http.StatusBadRequest, tplMessage, makeMsgTpl(a.i18n.T("users.resetPassword"), "", a.i18n.T("users.invalidResetLink")))
+		return c.Render(http.StatusBadRequest, tplAuthMessage, makeMsgTpl("Lien expiré", "", "Ce lien de réinitialisation n’est plus valable. Demandez-en un nouveau depuis « Mot de passe oublié ? »."))
 	}
 
 	// Get the user.
 	user, err := a.core.GetUser(0, "", email)
 	if err != nil {
-		return c.Render(http.StatusBadRequest, tplMessage, makeMsgTpl(a.i18n.T("users.resetPassword"), "", a.i18n.T("users.invalidResetLink")))
+		return c.Render(http.StatusBadRequest, tplAuthMessage, makeMsgTpl("Lien expiré", "", "Ce lien de réinitialisation n’est plus valable. Demandez-en un nouveau depuis « Mot de passe oublié ? »."))
 	}
 
 	// Password login is disabled for the user.
 	if !user.PasswordLogin {
-		return c.Render(http.StatusBadRequest, tplMessage, makeMsgTpl(a.i18n.T("users.resetPassword"), "", a.i18n.T("public.invalidFeature")))
+		return c.Render(http.StatusBadRequest, tplAuthMessage, makeMsgTpl("Indisponible", "", "La connexion par mot de passe est désactivée pour ce compte."))
 	}
 
 	user.Password = null.NewString(password, true)
@@ -945,6 +946,9 @@ func validateOIDCSettings(set models.Settings, userRoles []auth.Role, listRoles 
 // Relais app when none was asked for.
 func landingURI(next string) string {
 	if u := utils.SanitizeURI(next); u != "/" {
+		if !legacyAdmin() && appurls.IsLegacyAdmin(u) {
+			return appurls.ForAdmin(u)
+		}
 		return u
 	}
 	return uriLanding

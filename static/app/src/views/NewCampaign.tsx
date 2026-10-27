@@ -148,7 +148,7 @@ export function NewCampaign() {
             <>
               <h2>À qui envoyer ?</h2>
               {allLists.length === 0 ? (
-                <p className="muted">Ce projet n’a pas encore de liste. Créez-en une dans l’ancienne interface en attendant l’écran Listes.</p>
+                <p className="muted">Ce projet n’a pas encore de liste. <Link className="link" to="/listes">Créez-en une</Link>, puis revenez ici.</p>
               ) : (
                 <div className="choice-list">
                   {allLists.map((l) => (

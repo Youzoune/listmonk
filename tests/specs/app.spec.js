@@ -24,9 +24,9 @@ test.describe('Relais app', () => {
     const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const page = await context.newPage();
     await page.goto('/admin/login');
-    await page.getByLabel('Username').fill('admin');
-    await page.getByLabel('Password').fill('listmonk');
-    await page.getByRole('button', { name: 'Login' }).click();
+    await page.getByLabel('Identifiant').fill('admin');
+    await page.getByLabel('Mot de passe').fill('listmonk');
+    await page.getByRole('button', { name: 'Se connecter' }).click();
     await expect(page).toHaveURL(new RegExp(`${APP}/?$`));
     await context.close();
   });
@@ -37,9 +37,9 @@ test.describe('Relais app', () => {
     await page.goto(`${APP}/audience`);
     await expect(page).toHaveURL(/\/admin\/login\?next=%2Fapp%2Faudience/);
 
-    await page.getByLabel('Username').fill('admin');
-    await page.getByLabel('Password').fill('listmonk');
-    await page.getByRole('button', { name: 'Login' }).click();
+    await page.getByLabel('Identifiant').fill('admin');
+    await page.getByLabel('Mot de passe').fill('listmonk');
+    await page.getByRole('button', { name: 'Se connecter' }).click();
     await expect(page).toHaveURL(/\/app\/audience$/);
     await expect(page.getByRole('heading', { name: 'Audience' })).toBeVisible();
     await context.close();

@@ -196,7 +196,7 @@ export function Guide() {
               </table>
             </div>
             <p>
-              Les rebonds sont listés dans l’ancienne interface, rubrique Abonnés › Rebonds. Google propose aussi les <em>Postmaster Tools</em>, gratuits,
+              Les rebonds sont listés dans Audience › Rebonds. Google propose aussi les <em>Postmaster Tools</em>, gratuits,
               pour suivre la réputation de votre domaine chez Gmail.
             </p>
           </section>
