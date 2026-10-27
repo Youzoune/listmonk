@@ -25,14 +25,13 @@ Les migrations du fork continuent la numérotation upstream à partir de `v7.1.0
 (`internal/migrations/v7.1.0.go`). Comme on ne reprend plus les migrations upstream,
 il n'y a pas de risque de collision.
 
-## Question ouverte : le front
+## Front : décision
 
-Le ticket prévoyait de migrer l'interface Vue/Buefy vers React. Or upstream a supprimé le front
-Vue (commit `5523abf7`) : l'admin est maintenant rendu côté serveur (templates Go dans
-`static/admin/views` et `static/admin/partials`, avec Alpine.js et la librairie CSS Oat).
-Deux options :
+Upstream a supprimé le front Vue (commit `5523abf7`) : l'admin est rendu côté serveur (templates Go
+dans `static/admin/views` et `static/admin/partials`, avec Alpine.js et la librairie CSS Oat).
 
-* garder le rendu serveur et l'étendre (le moins de travail, cohérent avec le code actuel) ;
-* écrire un front React (shadcn/ui) séparé, branché sur l'API JSON, et retirer les vues serveur.
+**Décision (25/10)** : on ne garde pas ce rendu serveur. Le nouveau front est une application React
+branchée sur l'API JSON, qui remplacera les vues serveur.
 
-À trancher avant le lot 3, qui ajoute les écrans du multi-projet.
+Une maquette React de la nouvelle interface, avec une proposition de marque (« Relais »), est dans
+[maquette/](maquette/) : sources JSX dans `maquette/src`, page autonome générée par `bun ./build.mjs`.
