@@ -87,6 +87,7 @@ export function Shell() {
           ))}
         </nav>
         <div className="side-foot">
+          <NavLink to="/guide"><Icon name="book" /> <span>Guide de l’envoi</span></NavLink>
           <NavLink to="/marque"><Icon name="brand" /> <span>Identité Relais</span></NavLink>
           <a href="/admin">
             <Icon name="out" /> <span>Ancienne interface</span>

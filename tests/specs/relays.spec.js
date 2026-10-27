@@ -189,4 +189,35 @@ test.describe('Relays', () => {
     expect(relays.find((r) => r.name === 'email-partage').system).toBe(true);
     expect(relays.find((r) => r.pool).system).toBe(false);
   });
+
+  test('fills a relay from a provider preset and explains the settings', async ({ page, context }) => {
+    await context.addCookies([{ name: 'relais_project', value: String(sport), url: test.info().project.use.baseURL }]);
+    await page.addInitScript((id) => { try { localStorage.setItem('relais.project', String(id)); } catch { /* none */ } }, sport);
+
+    await page.goto('/app/relais');
+    await page.getByRole('button', { name: /sport/ }).click();
+    await page.getByLabel('Partir d’une préconfiguration').selectOption({ label: 'OVHcloud (MX Plan, Email Pro)' });
+    await expect(page.locator('.preset-card')).toContainText('200 e-mails par heure');
+    await page.getByRole('button', { name: 'Appliquer' }).click();
+    await expect(page.getByLabel('Par heure')).toHaveValue('180');
+    await expect(page.getByLabel('Par minute')).toHaveValue('3');
+    await expect(page.getByLabel('Par jour')).toHaveValue('0');
+
+    await page.getByRole('button', { name: 'Enregistrer' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Enregistré' })).toBeVisible();
+    await waitForReload(page);
+    const relay = (await api(page, 'GET', '/api/relays', { project: sport })).data.find((r) => r.name === 'email-sport');
+    expect(relay.cadence).toMatchObject({ per_minute: 3, per_hour: 180, per_day: 0 });
+    expect(relay.warmup.enabled).toBe(false);
+
+    // The relay now reads as following the preset, and every setting has its explanation.
+    await page.reload();
+    await page.getByRole('button', { name: /sport/ }).click();
+    await expect(page.getByText('Réglages actuels : « OVHcloud (MX Plan, Email Pro) »')).toBeVisible();
+    await page.getByText('C’est quoi, le warm-up ? En ai-je besoin ?').click();
+    await page.getByRole('link', { name: 'Lire la suite dans le guide' }).last().click();
+    await expect(page).toHaveURL(/\/app\/guide#warmup$/);
+    await expect(page.getByRole('heading', { name: 'Le warm-up' })).toBeInViewport();
+    await expect(page.locator('#warmup .ladder li').first()).toContainText('50');
+  });
 });

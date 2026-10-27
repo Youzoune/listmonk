@@ -12,6 +12,7 @@ import { ProjectProvider } from './project';
 import { Audience } from './views/Audience';
 import { Brand } from './views/Brand';
 import { Campaigns } from './views/Campaigns';
+import { Guide } from './views/Guide';
 import { Home } from './views/Home';
 import { NewCampaign } from './views/NewCampaign';
 import { ProjectEdit } from './views/ProjectEdit';
@@ -51,6 +52,7 @@ const router = createBrowserRouter(
         { path: 'projets', element: <Projects /> },
         { path: 'projets/nouveau', element: <ProjectEdit /> },
         { path: 'projets/:id', element: <ProjectEdit /> },
+        { path: 'guide', element: <Guide /> },
         { path: 'marque', element: <Brand /> },
         { path: '*', element: <NotFound /> },
       ],

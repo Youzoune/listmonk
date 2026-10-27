@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useRelays, useSaveRelay } from '../api/hooks';
 import type { Relay, RelayCadence, RelayWarmup } from '../api/types';
-import { Chip, ErrorState, Icon, Loading } from '../components/ui';
+import { Link } from 'react-router';
+import { Chip, ErrorState, Explain, Icon, Loading } from '../components/ui';
 import { dateTime, num } from '../lib/format';
+import { PRESETS, applyPreset, matchingPreset, type Preset } from '../lib/presets';
 import { DAY_NAMES, EMPTY_CADENCE, EMPTY_WARMUP, WEEK, cadenceSummary, relayName, toCadence, today, windowSummary } from '../lib/relays';
 import { dailyLimit, warmupCap, warmupDay, warmupDoneDay } from '../lib/sending';
 import { useProject } from '../project';
@@ -66,6 +68,36 @@ function NumberField({ id, label, value, onChange, unit, min = 0, max = 100000, 
   );
 }
 
+function PresetPicker({ disabled, current, onApply }: { disabled: boolean; current?: Preset; onApply: (p: Preset) => void }) {
+  const [id, setId] = useState(current?.id ?? '');
+  const chosen = PRESETS.find((p) => p.id === id);
+  const group = (kind: Preset['kind']) => PRESETS.filter((p) => p.kind === kind).map((p) => <option key={p.id} value={p.id}>{p.name}</option>);
+  return (
+    <div className="preset">
+      <div className="field">
+        <label htmlFor="preset">Partir d’une préconfiguration</label>
+        <div className="preset-row">
+          <select id="preset" value={id} disabled={disabled} onChange={(e) => setId(e.target.value)}>
+            <option value="">Choisir…</option>
+            <optgroup label="Selon votre situation">{group('profile')}</optgroup>
+            <optgroup label="Selon votre fournisseur">{group('provider')}</optgroup>
+          </select>
+          <button type="button" className="btn" disabled={disabled || !chosen} onClick={() => chosen && onApply(chosen)}>Appliquer</button>
+        </div>
+        <p className="hint">Remplit la cadence et le warm-up ci-dessous. Rien n’est enregistré avant de cliquer sur Enregistrer.</p>
+      </div>
+      {chosen && (
+        <div className="preset-card">
+          <p className="strong">{chosen.name}</p>
+          <p className="small">{chosen.when}</p>
+          {chosen.limits && <p className="small"><span className="strong">Limite du fournisseur :</span> {chosen.limits} Relais garde une marge d’environ 10 %.</p>}
+          {chosen.source && <p className="small"><a className="link" href={chosen.source} target="_blank" rel="noreferrer">Source</a> · valeurs relevées en octobre 2026, à vérifier si votre offre a changé.</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RelayEditor({ relay }: { relay: Relay }) {
   const { project, projects, can } = useProject();
   const canEdit = can('settings:manage') && !relay.pool;
@@ -75,7 +107,16 @@ function RelayEditor({ relay }: { relay: Relay }) {
   const [warmup, setWarmup] = useState<RelayWarmup>(relay.warmup.start > 0 ? { ...EMPTY_WARMUP, ...relay.warmup } : { ...EMPTY_WARMUP, enabled: relay.warmup.enabled });
   const [projectId, setProjectId] = useState(relay.project_id);
   const [system, setSystem] = useState(relay.system);
+  const [applied, setApplied] = useState<Preset | null>(null);
   const status = relay.status;
+  const current = matchingPreset(cadence, warmup);
+
+  const apply = (p: Preset) => {
+    const next = applyPreset(p, cadence, warmup);
+    setCadence(next.cadence);
+    setWarmup(next.warmup);
+    setApplied(p);
+  };
 
   const setC = (patch: Partial<RelayCadence>) => setCadence({ ...cadence, ...patch });
   const setW = (patch: Partial<RelayWarmup>) => setWarmup({ ...warmup, ...patch });
@@ -151,6 +192,20 @@ function RelayEditor({ relay }: { relay: Relay }) {
               onChange={(e) => setSystem(e.target.checked)} />
             <span>Envoyer les notifications système par ce relais (confirmations d’inscription, alertes de l’équipe)</span>
           </label>
+          <Explain title="Pourquoi un relais à part pour les notifications ?">
+            <p>
+              Une confirmation d’inscription doit arriver dans la minute, même quand une grosse newsletter attend son tour ou que le
+              relais des campagnes a atteint son quota du jour. Un relais dédié, sans cadence ni warm-up, garde ces e-mails rapides
+              et protège leur réputation des aléas des campagnes.
+            </p>
+          </Explain>
+
+          <h3>Préconfiguration</h3>
+          <PresetPicker key={current?.id ?? 'none'} disabled={!canEdit} current={current} onApply={apply} />
+          {applied && (
+            <p className="saved" role="status"><Icon name="check" size={16} /> « {applied.name} » appliquée. Vérifiez les valeurs, puis enregistrez.</p>
+          )}
+          {!applied && current && <p className="small muted">Réglages actuels : « {current.name} ».</p>}
 
           <h3>Cadence</h3>
           <div className="grid-3">
@@ -159,6 +214,14 @@ function RelayEditor({ relay }: { relay: Relay }) {
             <NumberField id="per-day" label="Par jour" unit="e-mails" value={cadence.per_day} onChange={(v) => setC({ per_day: v })} />
           </div>
           <p className="small muted">0 = pas de limite. Les e-mails sont espacés régulièrement dans la minute ; la limite la plus basse l’emporte.</p>
+          <Explain title="À quoi sert la cadence ?" guide="cadence">
+            <p>
+              Votre fournisseur limite le nombre d’e-mails que vous pouvez envoyer (par exemple 200 par heure chez OVHcloud, 2 000
+              par jour chez Google Workspace). Au-delà, il bloque le compte pendant des heures. La cadence garde vos campagnes sous
+              ces limites et espace les envois, comme le ferait un expéditeur normal.
+            </p>
+            <p>Si vous ne connaissez pas les limites de votre fournisseur, choisissez-le dans les préconfigurations ci-dessus.</p>
+          </Explain>
 
           <h3>Plage d’envoi</h3>
           <div className="day-toggles" role="group" aria-label="Jours d’envoi">
@@ -178,6 +241,13 @@ function RelayEditor({ relay }: { relay: Relay }) {
             </div>
           </div>
           <p className="small muted">{windowSummary(cadence) ? `Envois ${windowSummary(cadence)}.` : 'Envois tous les jours, à toute heure.'} « De 0 à 0 » veut dire toute la journée.</p>
+          <Explain title="Pourquoi limiter les jours et les heures ?" guide="cadence">
+            <p>
+              Un e-mail reçu à 3 h du matin attend des heures sous d’autres messages et a moins de chances d’être ouvert. Or les
+              fournisseurs regardent si vos e-mails sont ouverts pour décider de les mettre en spam la fois suivante. Hors de la plage,
+              la campagne attend simplement le prochain créneau.
+            </p>
+          </Explain>
 
           <div className="h3-row">
             <h3>Warm-up</h3>
@@ -205,6 +275,18 @@ function RelayEditor({ relay }: { relay: Relay }) {
               </p>
             </>
           ) : <p className="small muted">Sans warm-up, le relais envoie directement jusqu’à sa limite journalière.</p>}
+          <Explain title="C’est quoi, le warm-up ? En ai-je besoin ?" guide="warmup">
+            <p>
+              Gmail, Outlook ou Orange se méfient d’un domaine ou d’un serveur qu’ils ne connaissent pas encore : s’il envoie d’un
+              coup des milliers d’e-mails, ils les classent en spam. Le warm-up commence petit (par exemple 50 e-mails le premier
+              jour) et augmente un peu chaque jour, le temps de gagner leur confiance.
+            </p>
+            <p>
+              <span className="strong">Activez-le</span> pour un nouveau domaine, un nouveau serveur ou une liste restée sans nouvelles
+              depuis des mois. <span className="strong">Inutile</span> pour un relais de notifications ou un prestataire comme Brevo qui
+              gère déjà la réputation de ses serveurs.
+            </p>
+          </Explain>
 
           <p className="small muted">En une ligne : {cadenceSummary(cadence, warmup)}.</p>
 
@@ -247,6 +329,7 @@ export function Relays() {
           <p className="eyebrow">{project.name}</p>
           <h1>Relais d’envoi</h1>
         </div>
+        <Link className="btn" to="/guide"><Icon name="book" size={16} /> Comprendre le spam et le warm-up</Link>
       </header>
 
       {relays.isPending ? <Loading /> : relays.isError ? <ErrorState error={relays.error} retry={() => relays.refetch()} /> : (

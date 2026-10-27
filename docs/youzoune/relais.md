@@ -51,6 +51,23 @@ cours ne font qu'attendre leur relais et qu'aucun e-mail n'est en cours d'envoi.
 l'avancement de chaque campagne et les compteurs des relais avant de s'arrêter ; la campagne reprend ensuite
 au même point. C'est un premier morceau du lot 6 (fiabilité au redémarrage).
 
+## Préconfigurations et explications
+
+L'écran Relais propose des **préconfigurations** (`static/app/src/lib/presets.ts`) qui remplissent la cadence et le
+warm-up ; rien n'est enregistré avant « Enregistrer ».
+
+| Selon la situation | Selon le fournisseur (limite publiée, Relais garde ~10 % de marge) |
+|---|---|
+| Nouveau domaine ou nouveau serveur (warm-up 50 / +20 % / 2 000, semaine 9 h–18 h) | OVHcloud MX Plan / Email Pro : 200 / h → 3 / min, 180 / h |
+| Domaine déjà utilisé, liste propre (warm-up 500 / +30 % / 10 000) | Google Workspace : 2 000 / jour → 1 800 / jour, warm-up |
+| Vieille liste à relancer (warm-up 30 / +15 % / 1 000) | Gmail personnel : ~500 / jour → 450 |
+| Notifications et transactionnels (aucun frein) | Microsoft 365 : 30 / min, 10 000 / jour → 25 / min, 9 000 / jour |
+| | Brevo gratuit : 300 / jour ; Amazon SES sandbox : 200 / 24 h, 1 / s |
+
+Valeurs relevées en octobre 2026 : à revoir si un fournisseur change ses offres. Chaque réglage a une explication
+dépliable, et la page **Guide de l'envoi** (`/app/guide`) explique le spam, la réputation, le warm-up, la cadence,
+SPF / DKIM / DMARC, les bons réflexes et les signaux d'alerte, pour quelqu'un qui n'y connaît rien.
+
 ## API
 
 | Méthode | Route | Permission |
