@@ -216,7 +216,7 @@ func main() {
 		media = initMediaStore(ko)
 
 		// Projects, for their public pages and the links in their e-mails.
-		projects = projectdir.New(urlCfg.RootURL, urlCfg.RootPath)
+		projects = projectdir.New(urlCfg.RootURL, urlCfg.RootPath, ko.String("projects.domain"))
 
 		fbOptinNotify = makeOptinNotifyHook(ko.Bool("privacy.unsubscribe_header"), urlCfg, projects, queries, i18n)
 

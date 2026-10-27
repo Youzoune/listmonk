@@ -1,6 +1,9 @@
 import { Link, useLocation, useNavigate } from 'react-router';
+import { useServerConfig } from '../api/hooks';
+import type { Project } from '../api/types';
 import { Chip, Icon, ProjectBadge } from '../components/ui';
 import { count } from '../lib/format';
+import { projectSubdomain } from '../lib/projects';
 import { useProject } from '../project';
 
 export function Projects() {
@@ -8,6 +11,9 @@ export function Projects() {
   const navigate = useNavigate();
   const canManage = can('projects:manage');
   const deleted = (useLocation().state as { deleted?: string } | null)?.deleted;
+  const base = useServerConfig(current.id).data?.projects_domain;
+  // The project's public host: its custom domain, else its subdomain.
+  const hostOf = (p: Project) => p.domain || projectSubdomain(p, base);
 
   const open = (id: number) => {
     setProject(id);
@@ -47,7 +53,7 @@ export function Projects() {
               {p.id === current.id && <Chip tone="brand">Projet ouvert</Chip>}
             </div>
             <dl className="facts facts-row">
-              <div><dt>Domaine</dt><dd className={p.domain ? 'mono' : 'muted'}>{p.domain || 'Pas encore de domaine'}</dd></div>
+              <div><dt>Adresse</dt><dd className={hostOf(p) ? 'mono' : 'muted'}>{hostOf(p) || 'Adresse principale'}</dd></div>
               <div><dt>Contenu</dt><dd>{count(p.list_count, 'liste')}, {count(p.campaign_count, 'campagne')}</dd></div>
             </dl>
             {p.description && <p className="small muted">{p.description}</p>}

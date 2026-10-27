@@ -14,7 +14,7 @@ var testProjects = []models.Project{
 }
 
 func testDir() *Dir {
-	d := New("https://lists.example.org", "/")
+	d := New("https://lists.example.org", "/", "")
 	d.Set(testProjects)
 	return d
 }
@@ -59,7 +59,7 @@ func TestProjectDirURLs(t *testing.T) {
 }
 
 func TestProjectDirPort(t *testing.T) {
-	d := New("http://localhost:9000", "/")
+	d := New("http://localhost:9000", "/", "")
 	d.Set(testProjects)
 	if got := d.RootURL(2); got != "http://news.sport.fr:9000" {
 		t.Errorf("rootURL with a port = %q", got)
@@ -70,9 +70,45 @@ func TestProjectDirPort(t *testing.T) {
 }
 
 func TestProjectDirSubPath(t *testing.T) {
-	d := New("http://example.org/listmonk", "/listmonk")
+	d := New("http://example.org/listmonk", "/listmonk", "")
 	d.Set(testProjects)
 	if got := d.RootURL(2); got != "http://news.sport.fr/listmonk" {
 		t.Errorf("rootURL with a sub-path = %q", got)
+	}
+}
+
+func TestProjectDirSubdomains(t *testing.T) {
+	d := New("https://relais.youzoune.fr", "/", ".Relais.Youzoune.fr.")
+	d.Set(testProjects)
+
+	if d.BaseDomain() != "relais.youzoune.fr" {
+		t.Fatalf("BaseDomain() = %q", d.BaseDomain())
+	}
+
+	cases := []struct{ got, want string }{
+		// The default project stays on the instance's address.
+		{d.RootURL(1), "https://relais.youzoune.fr"},
+		// A custom domain wins over the subdomain.
+		{d.RootURL(2), "https://news.sport.fr"},
+		{d.RootURL(3), "https://culture.relais.youzoune.fr"},
+		{d.ArchiveIndexURL(3), "https://culture.relais.youzoune.fr/archive"},
+		{d.Rebase(3, "https://relais.youzoune.fr/subscription/a/b"), "https://culture.relais.youzoune.fr/subscription/a/b"},
+		{d.Host(1), ""},
+		{d.Host(3), "culture.relais.youzoune.fr"},
+	}
+	for i, c := range cases {
+		if c.got != c.want {
+			t.Errorf("case %d: got %q, want %q", i, c.got, c.want)
+		}
+	}
+
+	for host, want := range map[string]int{"culture.relais.youzoune.fr": 3, "sport.relais.youzoune.fr": 2, "news.sport.fr": 2, "default.relais.youzoune.fr": 0, "relais.youzoune.fr": 0, "x.culture.relais.youzoune.fr": 0} {
+		id, _ := d.FromHost(host)
+		if id != want {
+			t.Errorf("FromHost(%q) = %d, want %d", host, id, want)
+		}
+	}
+	if !d.IsProjectHost("culture.relais.youzoune.fr") || d.IsProjectHost("evil.example.com") {
+		t.Error("IsProjectHost")
 	}
 }

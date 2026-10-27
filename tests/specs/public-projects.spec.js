@@ -1,11 +1,13 @@
 import { test, expect } from '@playwright/test';
-import { clearMail, getMail, resetDB } from '../helpers.js';
+import { PROJECTS_DOMAIN, clearMail, getMail, resetDB } from '../helpers.js';
 
-// Public pages per project (YZN-214, lot 5). Chromium resolves *.localhost to
-// this machine, so a project's domain can be served by the test instance.
+// Public pages per project (YZN-214, lot 5). Like Twenty's workspaces, every
+// project gets <slug>.<base domain>; the test instance's base domain is
+// relais.localhost, which Chromium resolves to this machine.
 const HEADER = 'X-Listmonk-Project';
 const PORT = new URL(process.env.LISTMONK_URL || 'http://localhost:9000').port || '9000';
-const SPORT = 'sport.localhost';
+// Sport has the automatic subdomain, Culture a custom domain.
+const SPORT = `sport.${PROJECTS_DOMAIN}`;
 const CULTURE = 'culture.localhost';
 const on = (host, path) => `http://${host}:${PORT}${path}`;
 
@@ -32,9 +34,15 @@ test.describe('Public pages per project', () => {
     await resetDB(browser);
   });
 
-  test('sets up two projects with their own domain and public lists', async ({ page }) => {
-    sport = (await api(page, 'POST', '/api/projects', { body: { name: 'Club Sport', slug: 'sport', domain: SPORT } })).data.id;
+  test('sets up a project on its subdomain and one on a custom domain', async ({ page }) => {
+    expect((await api(page, 'GET', '/api/config')).data.projects_domain).toBe(PROJECTS_DOMAIN);
+    sport = (await api(page, 'POST', '/api/projects', { body: { name: 'Club Sport', slug: 'sport' } })).data.id;
     expect((await api(page, 'POST', '/api/projects', { body: { name: 'Culture', slug: 'culture', domain: CULTURE } })).status).toBe(200);
+
+    // Subdomains of the base domain are automatic, not custom domains.
+    const under = await api(page, 'POST', '/api/projects', { body: { name: 'X', slug: 'x', domain: `x.${PROJECTS_DOMAIN}` } });
+    expect(under.status).toBe(400);
+    expect(under.message).toContain(PROJECTS_DOMAIN);
 
     sportList = (await api(page, 'POST', '/api/lists', { project: sport, body: { name: 'Gazette du club', type: 'public', optin: 'single' } })).data;
     defaultList = (await api(page, 'POST', '/api/lists', { body: { name: 'Lettre principale', type: 'public', optin: 'single' } })).data;
@@ -149,12 +157,29 @@ test.describe('Public pages per project', () => {
     expect(feed).toContain('<title>Club Sport</title>');
   });
 
-  test('shows the public addresses on the project screen', async ({ page }) => {
+  test('lets the proxy check a domain before getting its certificate', async ({ page }) => {
+    const check = async (domain) => (await page.request.get(`/api/public/domains/check?domain=${encodeURIComponent(domain)}`)).status();
+    expect(await check(SPORT)).toBe(200);
+    expect(await check(CULTURE)).toBe(200);
+    expect(await check('localhost')).toBe(200);
+    expect(await check(`default.${PROJECTS_DOMAIN}`)).toBe(404);
+    expect(await check(`inconnu.${PROJECTS_DOMAIN}`)).toBe(404);
+    expect(await check('evil.example.com')).toBe(404);
+  });
+
+  test('shows the public addresses on the project screens', async ({ page }) => {
     await page.goto(`/app/projets/${sport}`);
     const panel = page.locator('.public-pages');
     await expect(panel).toContainText(SPORT);
     await expect(panel.getByRole('link', { name: on(SPORT, '/subscription/form') })).toBeVisible();
-    await panel.getByText('Brancher le domaine, étape par étape').click();
-    await expect(panel).toContainText('CNAME');
+    await expect(panel).toContainText('Rien à brancher');
+
+    await page.goto('/app/projets');
+    await expect(page.locator('.project-card').filter({ hasText: 'Club Sport' })).toContainText(SPORT);
+    const culture = page.locator('.project-card').filter({ hasText: 'Culture' });
+    await expect(culture).toContainText(CULTURE);
+    await culture.getByRole('link', { name: 'Réglages et accès' }).click();
+    await page.getByText('Brancher le domaine personnalisé').click();
+    await expect(page.locator('.public-pages')).toContainText(`${CULTURE} → culture.${PROJECTS_DOMAIN}`);
   });
 });

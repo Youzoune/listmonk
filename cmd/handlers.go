@@ -322,6 +322,7 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 		g.GET("/api/public/lists", a.GetPublicLists)
 		g.POST("/api/public/subscription", a.PublicSubscription)
 		g.GET("/api/public/captcha/altcha", a.AltchaChallenge)
+		g.GET("/api/public/domains/check", a.CheckPublicDomain)
 		if a.cfg.EnablePublicArchive {
 			g.GET("/api/public/archive", a.GetCampaignArchives)
 		}

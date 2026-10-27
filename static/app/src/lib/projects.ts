@@ -46,26 +46,39 @@ export interface PublicURLs {
   form: string;
   archive: string;
   feed: string;
-  // The project has its own domain.
-  ownDomain: boolean;
+  // Host of the project's pages, "" when they're on the instance's address.
+  host: string;
+  kind: 'custom' | 'subdomain' | 'instance';
 }
 
-// The public addresses of a project, as the server builds them
-// (internal/projectdir): its own domain (same scheme, port and path) if it has one, otherwise the
-// instance's address with ?project=<slug> (none for the default project).
-export function publicURLs(p: { id: number; slug: string; domain: string | null }, rootURL: string): PublicURLs {
+const DEFAULT_PROJECT_ID = 1;
+
+// The automatic host of a project, <slug>.<base>, as the server gives it
+// (internal/projectdir): none for the default project or without a base domain.
+export function projectSubdomain(p: { id: number; slug: string }, base: string | undefined): string {
+  const b = (base ?? '').trim().toLowerCase().replace(/^\.+|\.+$/g, '');
+  if (!b || p.id === DEFAULT_PROJECT_ID || !p.slug || p.slug.length > 63) return '';
+  return `${p.slug}.${b}`;
+}
+
+// The public addresses of a project: its custom domain, else its subdomain
+// (same scheme, port and path as the instance), else the instance's address
+// with ?project=<slug> (none for the default project).
+export function publicURLs(p: { id: number; slug: string; domain: string | null }, rootURL: string, base?: string): PublicURLs {
   const root = rootURL.replace(/\/+$/, '');
-  if (p.domain) {
-    let base = `https://${p.domain.toLowerCase()}`;
+  const custom = (p.domain ?? '').toLowerCase();
+  const host = custom || projectSubdomain(p, base);
+  if (host) {
+    let r = `https://${host}`;
     try {
       const u = new URL(root);
-      base = `${u.protocol}//${p.domain.toLowerCase()}${u.port ? `:${u.port}` : ''}${u.pathname.replace(/\/+$/, '')}`;
+      r = `${u.protocol}//${host}${u.port ? `:${u.port}` : ''}${u.pathname.replace(/\/+$/, '')}`;
     } catch { /* keep https */ }
-    return { root: base, form: `${base}/subscription/form`, archive: `${base}/archive`, feed: `${base}/archive.xml`, ownDomain: true };
+    return { root: r, form: `${r}/subscription/form`, archive: `${r}/archive`, feed: `${r}/archive.xml`, host, kind: custom ? 'custom' : 'subdomain' };
   }
 
-  const q = p.id === 1 ? '' : `?project=${encodeURIComponent(p.slug)}`;
-  return { root, form: `${root}/subscription/form${q}`, archive: `${root}/archive${q}`, feed: `${root}/archive.xml${q}`, ownDomain: false };
+  const q = p.id === DEFAULT_PROJECT_ID ? '' : `?project=${encodeURIComponent(p.slug)}`;
+  return { root, form: `${root}/subscription/form${q}`, archive: `${root}/archive${q}`, feed: `${root}/archive.xml${q}`, host: '', kind: 'instance' };
 }
 
 // The host the project's domain should point to (CNAME target).
@@ -75,4 +88,11 @@ export function rootHost(rootURL: string): string {
   } catch {
     return '';
   }
+}
+
+// A custom domain can't sit under the base domain: those subdomains are automatic.
+export function isUnderBase(domain: string, base: string | undefined): boolean {
+  const d = domain.trim().toLowerCase();
+  const b = (base ?? '').trim().toLowerCase();
+  return Boolean(b && d && (d === b || d.endsWith(`.${b}`)));
 }

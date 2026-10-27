@@ -7,7 +7,7 @@ const APP = '/app';
 async function createProject(page, { name, domain }) {
   await page.goto(`${APP}/projets/nouveau`);
   await page.getByLabel('Nom').fill(name);
-  if (domain !== undefined) await page.getByLabel('Domaine (facultatif)').fill(domain);
+  if (domain !== undefined) await page.getByLabel(/^Domaine( personnalisé)? \(facultatif\)$/).fill(domain);
   await page.getByRole('button', { name: 'Créer le projet' }).click();
 }
 
@@ -34,13 +34,13 @@ test.describe('Relais projects', () => {
     await expect(page.getByLabel('Identifiant')).toHaveValue('club-sport-lyon');
     await expect(page.getByText('Un nom d’hôte comme newsletter.exemple.fr, sans http://.')).toBeVisible();
 
-    await page.getByLabel('Domaine (facultatif)').fill('News.Sport.Example.com');
+    await page.getByLabel(/^Domaine( personnalisé)? \(facultatif\)$/).fill('News.Sport.Example.com');
     await page.getByRole('button', { name: 'Créer le projet' }).click();
 
     await expect(page).toHaveURL(/\/app\/projets\/\d+$/);
     projectURL = new URL(page.url()).pathname;
     await expect(page.getByRole('status')).toContainText('« Club Sport — Lyon » est créé');
-    await expect(page.getByLabel('Domaine (facultatif)')).toHaveValue('news.sport.example.com');
+    await expect(page.getByLabel(/^Domaine( personnalisé)? \(facultatif\)$/)).toHaveValue('news.sport.example.com');
 
     // The super admin sees every project.
     await expect(page.locator('.access-row').filter({ hasText: 'admin' })).toContainText('Tous les projets');

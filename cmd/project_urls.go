@@ -2,6 +2,8 @@ package main
 
 import (
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/knadh/listmonk/internal/core"
 	"github.com/knadh/listmonk/internal/projectdir"
@@ -60,6 +62,30 @@ func (a *App) publicProjectID(c *echo.Context) int {
 func (a *App) onHostProject(c *echo.Context, projectID int) bool {
 	id, ok := a.hostProject(c)
 	return !ok || id == projectID
+}
+
+// CheckPublicDomain answers 200 if the ?domain= host serves Relais (the
+// instance's own host or a project's subdomain or custom domain), and 404
+// otherwise. A reverse proxy such as Caddy calls it before getting a
+// certificate on demand, so that certificates are only issued for real
+// projects, the way Twenty serves its workspaces' subdomains.
+func (a *App) CheckPublicDomain(c *echo.Context) error {
+	host := strings.ToLower(strings.TrimSpace(c.QueryParam("domain")))
+	if host != "" && (host == a.rootHost() || a.projects.IsProjectHost(host)) {
+		return c.String(http.StatusOK, "ok")
+	}
+
+	return c.String(http.StatusNotFound, "unknown domain")
+}
+
+// rootHost is the host of the instance's root URL.
+func (a *App) rootHost() string {
+	u, err := url.Parse(a.urlCfg.RootURL)
+	if err != nil {
+		return ""
+	}
+
+	return strings.ToLower(u.Hostname())
 }
 
 // notFoundPage renders the public "not found" page.

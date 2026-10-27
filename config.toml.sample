@@ -5,6 +5,15 @@
 # port, use port 80 (this will require running with elevated permissions).
 address = "localhost:9000"
 
+# Projects (YZN-214). Like Twenty's workspaces, every project but the default
+# one gets the subdomain <project-identifier>.<domain> for its public pages and
+# the links in its e-mails. Point a wildcard DNS record (*.<domain>) at this
+# server and serve it with a wildcard certificate, or let Caddy get one per
+# subdomain on demand (see docs/youzoune/pages-publiques.md).
+# Env: LISTMONK_projects__domain
+[projects]
+domain = ""
+
 # Database.
 [db]
 host = "localhost"
