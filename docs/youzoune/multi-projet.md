@@ -25,7 +25,8 @@ user_projects (user_id, project_id)   accès des utilisateurs aux projets
 * Les tables qui dépendent d'une ligne parente (`subscriber_lists`, `campaign_lists`, `campaign_views`,
   `link_clicks`, `bounces`, `campaign_media`) n'ont pas de `project_id` : le projet se déduit du parent.
 * Les clés étrangères vers `projects` sont en `ON DELETE RESTRICT` : on ne peut supprimer un projet
-  que s'il est vide.
+  que s'il n'a ni listes, ni abonnés, ni campagnes, ni médias. Ses modèles d'e-mail sont supprimés avec lui
+  (migration `v7.3.0`), puisque chaque projet en reçoit un à sa création.
 
 ### Décision : un abonné appartient à un seul projet
 

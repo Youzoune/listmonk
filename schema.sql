@@ -100,7 +100,8 @@ CREATE INDEX IF NOT EXISTS idx_sub_lists_unsubscribed_updated_at ON subscriber_l
 DROP TABLE IF EXISTS templates CASCADE;
 CREATE TABLE templates (
     id              SERIAL PRIMARY KEY,
-    project_id      INTEGER NOT NULL REFERENCES projects(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    -- Templates go with their project; they don't keep it from being deleted.
+    project_id      INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE ON UPDATE CASCADE,
     name            TEXT NOT NULL,
     type            template_type NOT NULL DEFAULT 'campaign',
     subject         TEXT NOT NULL,

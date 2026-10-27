@@ -14,6 +14,8 @@ import { Brand } from './views/Brand';
 import { Campaigns } from './views/Campaigns';
 import { Home } from './views/Home';
 import { NewCampaign } from './views/NewCampaign';
+import { ProjectEdit } from './views/ProjectEdit';
+import { Projects } from './views/Projects';
 import { Relays } from './views/Relays';
 
 const queryClient = new QueryClient({
@@ -46,6 +48,9 @@ const router = createBrowserRouter(
         { path: 'campagnes/nouvelle', element: <NewCampaign /> },
         { path: 'audience', element: <Audience /> },
         { path: 'relais', element: <Relays /> },
+        { path: 'projets', element: <Projects /> },
+        { path: 'projets/nouveau', element: <ProjectEdit /> },
+        { path: 'projets/:id', element: <ProjectEdit /> },
         { path: 'marque', element: <Brand /> },
         { path: '*', element: <NotFound /> },
       ],

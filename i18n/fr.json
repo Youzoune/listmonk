@@ -425,7 +425,7 @@
     "projects.invalidDomain": "Domaine invalide. Utilisez un nom d'hôte comme newsletter.exemple.com.",
     "projects.invalidSlug": "Identifiant invalide. Utilisez des minuscules, des chiffres et des tirets (64 caractères max.).",
     "projects.listsAcrossProjects": "Les listes doivent toutes appartenir au même projet.",
-    "projects.notEmpty": "Le projet contient encore des listes, abonnés, campagnes, modèles ou médias. Supprimez-les d'abord.",
+    "projects.notEmpty": "Le projet contient encore des listes, abonnés, campagnes ou médias. Supprimez-les d'abord.",
     "projects.slugExists": "Un autre projet utilise déjà cet identifiant.",
     "public.archiveEmpty": "Aucun message archivé pour le moment.",
     "public.archiveTitle": "Archives des listes de diffusion",

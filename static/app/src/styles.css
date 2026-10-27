@@ -380,3 +380,27 @@ button.list-card:hover { border-color: var(--muted); }
 .table td:first-child { min-width: 220px; }
 .table td:nth-child(3) { min-width: 150px; }
 .table th, .table td { padding-inline: 14px; }
+
+/* Projects (lot 3). */
+.lead { max-width: 70ch; }
+.stack { display: grid; gap: 20px; align-content: start; min-width: 0; }
+.grid-2.align-start { align-items: start; }
+.with-badge { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.project-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 16px; }
+.project-card.is-current { border-color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
+.project-card-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.project-card-title { flex: 1; min-width: 0; }
+.project-card-title h2 { overflow-wrap: anywhere; }
+.field-error { color: var(--bad); font-size: .85rem; margin-top: -6px; }
+input[aria-invalid="true"] { border-color: var(--bad); }
+.field input.mono { font-family: var(--f-mono); font-size: .9rem; }
+.access-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.access-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-sm); cursor: pointer; min-height: 56px; flex-wrap: wrap; }
+.access-row input { width: 18px; height: 18px; accent-color: var(--fg); flex: none; }
+.access-row input:disabled + .access-who { opacity: .8; }
+.access-who { flex: 1; min-width: 160px; }
+.danger-zone { border-color: var(--bad-soft); }
+.btn-danger { background: var(--bad); border-color: var(--bad); color: var(--surface); }
+.switcher-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; border-top: 1px solid var(--line); padding: 8px 6px 2px; }
+.switcher-foot a { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: .875rem; color: var(--fg); min-height: 36px; }
+.saved { display: flex; align-items: center; gap: 6px; color: var(--ok); font-weight: 600; font-size: .9rem; }

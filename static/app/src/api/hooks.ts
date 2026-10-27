@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, query } from './client';
 import type {
   Campaign, CampaignStatus, DashboardCharts, DashboardCounts, List, NewCampaign, Page, Profile, Project,
-  ServerConfig, Settings, Subscriber,
+  ProjectInput, ServerConfig, Settings, Subscriber, User,
 } from './types';
 
 // Query keys start with the project so that switching project refetches everything.
@@ -77,5 +77,57 @@ export function useCreateCampaign(project: number | null) {
       return created;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
+}
+
+// Creates a project (no id) or updates one.
+export function useSaveProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, project }: { id?: number; project: ProjectInput }) =>
+      id ? api<Project>(`/api/projects/${id}`, { method: 'PUT', json: project }) : api<Project>('/api/projects', { method: 'POST', json: project }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+  });
+}
+
+export function useDeleteProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api<boolean>(`/api/projects/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+  });
+}
+
+export function useUsers(enabled: boolean) {
+  return useQuery({ queryKey: ['users'], queryFn: () => api<User[]>('/api/users'), enabled });
+}
+
+// The project IDs each given user has access to, keyed by user ID.
+export function useUsersProjects(userIds: number[], enabled: boolean) {
+  return useQuery({
+    queryKey: ['users-projects', userIds],
+    enabled: enabled && userIds.length > 0,
+    queryFn: async () => {
+      const pairs = await Promise.all(userIds.map(async (id) => [id, await api<number[]>(`/api/users/${id}/projects`)] as const));
+      return Object.fromEntries(pairs) as Record<number, number[]>;
+    },
+  });
+}
+
+// Updates a user's projects, showing the change right away and rolling it
+// back if the server refuses it.
+export function useSetUserProjects() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, projectIds }: { userId: number; projectIds: number[] }) =>
+      api<number[]>(`/api/users/${userId}/projects`, { method: 'PUT', json: { project_ids: projectIds } }),
+    onMutate: async ({ userId, projectIds }) => {
+      await qc.cancelQueries({ queryKey: ['users-projects'] });
+      const previous = qc.getQueriesData<Record<number, number[]>>({ queryKey: ['users-projects'] });
+      qc.setQueriesData<Record<number, number[]>>({ queryKey: ['users-projects'] }, (old) => (old ? { ...old, [userId]: projectIds } : old));
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => ctx?.previous.forEach(([key, data]) => qc.setQueryData(key, data)),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['users-projects'] }),
   });
 }
