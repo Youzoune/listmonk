@@ -98,7 +98,7 @@ func (a *App) LoginPage(c *echo.Context) error {
 	if c.Request().Method == http.MethodPost {
 		loginErr = a.doLogin(c)
 		if loginErr == nil {
-			return c.Redirect(http.StatusFound, utils.SanitizeURI(c.FormValue("next")))
+			return c.Redirect(http.StatusFound, landingURI(c.FormValue("next")))
 		}
 	}
 
@@ -116,7 +116,7 @@ func (a *App) LoginSetupPage(c *echo.Context) error {
 			a.Lock()
 			a.needsUserSetup = false
 			a.Unlock()
-			return c.Redirect(http.StatusFound, utils.SanitizeURI(c.FormValue("next")))
+			return c.Redirect(http.StatusFound, landingURI(c.FormValue("next")))
 		}
 	}
 
@@ -142,7 +142,7 @@ func (a *App) TwofaPage(c *echo.Context) error {
 	}
 
 	if next == "" || next == "/" {
-		next = uriAdmin
+		next = uriLanding
 	}
 
 	// Validate the 2FA temp token.
@@ -202,7 +202,7 @@ func (a *App) OIDCLogin(c *echo.Context) error {
 	// Sanitize the URL and make it relative.
 	next := utils.SanitizeURI(c.FormValue("next"))
 	if next == "/" {
-		next = uriAdmin
+		next = uriLanding
 	}
 
 	// Preparethe OIDC payload to send to the provider.
@@ -377,7 +377,7 @@ func (a *App) ResetPage(c *echo.Context) error {
 func (a *App) renderLoginPage(c *echo.Context, loginErr error) error {
 	next := utils.SanitizeURI(c.FormValue("next"))
 	if next == "/" {
-		next = uriAdmin
+		next = uriLanding
 	}
 
 	var (
@@ -452,7 +452,7 @@ func (a *App) renderLoginPage(c *echo.Context, loginErr error) error {
 func (a *App) renderLoginSetupPage(c *echo.Context, loginErr error) error {
 	next := utils.SanitizeURI(c.FormValue("next"))
 	if next == "/" {
-		next = uriAdmin
+		next = uriLanding
 	}
 
 	out := loginTpl{
@@ -761,8 +761,8 @@ func (a *App) doResetPassword(c *echo.Context, token, email string) error {
 		return err
 	}
 
-	// Redirect to the admin page.
-	return c.Redirect(http.StatusFound, uriAdmin)
+	// Redirect to the app.
+	return c.Redirect(http.StatusFound, uriLanding)
 }
 
 // renderTwofaPage renders the 2FA verification page.
@@ -939,4 +939,13 @@ func validateOIDCSettings(set models.Settings, userRoles []auth.Role, listRoles 
 		return fmt.Errorf("OIDC default list role ID %d does not exist", o.DefaultListRoleID.Int)
 	}
 	return validateOIDCRoles(o.Roles, userRoles, listRoles)
+}
+
+// landingURI is the page to go to after signing in: the requested one, or the
+// Relais app when none was asked for.
+func landingURI(next string) string {
+	if u := utils.SanitizeURI(next); u != "/" {
+		return u
+	}
+	return uriLanding
 }

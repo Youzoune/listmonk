@@ -20,6 +20,17 @@ test.describe('Relais app', () => {
     await resetDB(browser);
   });
 
+  test('lands on the app after signing in from the login page', async ({ browser }) => {
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
+    await page.goto('/admin/login');
+    await page.getByLabel('Username').fill('admin');
+    await page.getByLabel('Password').fill('listmonk');
+    await page.getByRole('button', { name: 'Login' }).click();
+    await expect(page).toHaveURL(new RegExp(`${APP}/?$`));
+    await context.close();
+  });
+
   test('sends people without a session to the login page and back', async ({ browser }) => {
     const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const page = await context.newPage();

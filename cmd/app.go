@@ -10,6 +10,10 @@ const (
 	// uriApp is where the React admin (static/app) is served.
 	uriApp = "/app"
 
+	// uriLanding is where people land after signing in when no page was asked
+	// for: the Relais app. The legacy admin stays at uriAdmin.
+	uriLanding = uriApp
+
 	appIndexFile = "/app/index.html"
 )
 
