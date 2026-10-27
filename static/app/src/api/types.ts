@@ -33,6 +33,8 @@ export interface ServerConfig {
   root_url: string;
   // The root URL comes from the server's environment (Coolify) and can't be changed here.
   root_url_locked?: boolean;
+  // permissions.json: [{ group, permissions }].
+  permissions?: unknown;
   // Base domain of the projects' subdomains, "" if none.
   projects_domain?: string;
   from_email: string;
@@ -304,4 +306,37 @@ export interface ImportParams {
   overwrite: boolean;
   delim: string;
   lists: number[];
+}
+
+export interface Role { id: number; name: string; permissions: string[] }
+
+export interface UserFull extends User {
+  password_login: boolean;
+  loggedin_at: string | null;
+  created_at: string;
+  list_role: { id: number; name: string } | null;
+}
+
+export interface UserInput {
+  username: string;
+  name: string;
+  email: string;
+  type: 'user' | 'api';
+  status: 'enabled' | 'disabled';
+  password_login: boolean;
+  password: string;
+  user_role_id: number;
+  list_role_id: number | null;
+}
+
+export interface Media { id: number; uuid: string; filename: string; content_type: string; url: string; thumb_url: string; created_at: string; meta?: Record<string, unknown> }
+
+export interface Bounce {
+  id: number;
+  type: 'soft' | 'hard' | 'complaint';
+  source: string;
+  email: string;
+  subscriber_id: number;
+  campaign: { id: number; name: string } | null;
+  created_at: string;
 }

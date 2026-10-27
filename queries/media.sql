@@ -7,7 +7,8 @@ SELECT COUNT(*) OVER () AS total, * FROM media
     WHERE ($1 = '' OR filename ILIKE $1) AND provider=$2
     -- Optional project (0 = all projects).
     AND ($5 = 0 OR project_id = $5)
-    ORDER BY created_at DESC OFFSET $3 LIMIT $4;
+    -- per_page=all comes as a limit of 0: no limit.
+    ORDER BY created_at DESC OFFSET $3 LIMIT (CASE WHEN $4 < 1 THEN NULL ELSE $4 END);
 
 -- name: get-media
 SELECT * FROM media WHERE

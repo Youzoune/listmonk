@@ -8,8 +8,10 @@ const NAV: { to: string; label: string; icon: IconName; perms?: string[] }[] = [
   { to: '/campagnes', label: 'Campagnes', icon: 'send', perms: ['campaigns:get_all', 'campaigns:get'] },
   { to: '/audience', label: 'Audience', icon: 'users', perms: ['subscribers:get_all', 'subscribers:get'] },
   { to: '/modeles', label: 'Modèles', icon: 'page', perms: ['templates:get'] },
+  { to: '/medias', label: 'Médias', icon: 'layers', perms: ['media:get'] },
   { to: '/relais', label: 'Relais d’envoi', icon: 'relay', perms: ['settings:get'] },
   { to: '/projets', label: 'Projets', icon: 'layers', perms: ['projects:get', 'projects:manage'] },
+  { to: '/equipe', label: 'Équipe', icon: 'users', perms: ['users:get'] },
   { to: '/reglages', label: 'Réglages', icon: 'gear', perms: ['settings:get'] },
 ];
 

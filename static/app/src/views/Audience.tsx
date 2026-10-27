@@ -64,6 +64,7 @@ export function Audience() {
         </div>
         <div className="row-gap">
           <Link className="btn" to="/listes">Gérer les listes</Link>
+          {can('bounces:get') && <Link className="btn btn-ghost" to="/rebonds">Rebonds</Link>}
           {can('subscribers:import') && <Link className="btn" to="/audience/import">Importer un fichier</Link>}
           {can('subscribers:manage') && <Link className="btn btn-primary" to="/audience/nouveau"><Icon name="plus" /> Nouveau contact</Link>}
         </div>

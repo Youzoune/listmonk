@@ -10,6 +10,9 @@ import { ApiError } from './api/client';
 import { Shell } from './components/Shell';
 import { ProjectProvider } from './project';
 import { Audience } from './views/Audience';
+import { Bounces } from './views/Bounces';
+import { MediaLibrary } from './views/MediaLibrary';
+import { Users } from './views/Users';
 import { Brand } from './views/Brand';
 import { CampaignDetail } from './views/CampaignDetail';
 import { Campaigns } from './views/Campaigns';
@@ -59,6 +62,9 @@ const router = createBrowserRouter(
         { path: 'audience/import', element: <Import /> },
         { path: 'audience/:id', element: <SubscriberEdit /> },
         { path: 'listes', element: <Lists /> },
+        { path: 'rebonds', element: <Bounces /> },
+        { path: 'medias', element: <MediaLibrary /> },
+        { path: 'equipe', element: <Users /> },
         { path: 'relais', element: <Relays /> },
         { path: 'projets', element: <Projects /> },
         { path: 'projets/nouveau', element: <ProjectEdit /> },

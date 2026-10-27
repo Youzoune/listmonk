@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api, query } from './client';
 import type {
   Campaign, CampaignStatus, DashboardCharts, DashboardCounts, List, NewCampaign, Page, Profile, Project,
-  AnalyticsCount, AnalyticsLink, ImportParams, ImportStatus, ListInput, ProjectInput, Relay, RelayInput, ServerConfig, Settings, SmtpServer, Subscriber, SubscriberInput, Template, TemplateInput, User,
+  AnalyticsCount, AnalyticsLink, Bounce, Media, Role, UserFull, UserInput, ImportParams, ImportStatus, ListInput, ProjectInput, Relay, RelayInput, ServerConfig, Settings, SmtpServer, Subscriber, SubscriberInput, Template, TemplateInput, User,
 } from './types';
 
 // Query keys start with the project so that switching project refetches everything.
@@ -352,4 +352,91 @@ export function useCampaignAnalytics(project: number | null, id: number | null, 
   const clicks = useQuery({ queryKey: key(project, 'camp-clicks', id, range), queryFn: () => api<AnalyticsCount[]>(q('clicks')), enabled });
   const links = useQuery({ queryKey: key(project, 'camp-links', id, range), queryFn: () => api<AnalyticsLink[]>(q('links')), enabled });
   return { views, clicks, links };
+}
+
+export function useUsersFull(enabled: boolean) {
+  return useQuery({ queryKey: ['users-full'], queryFn: () => api<UserFull[]>('/api/users'), enabled });
+}
+
+export function useRoles(enabled: boolean) {
+  const users = useQuery({ queryKey: ['roles', 'users'], queryFn: () => api<Role[]>('/api/roles/users'), enabled });
+  const lists = useQuery({ queryKey: ['roles', 'lists'], queryFn: () => api<Role[]>('/api/roles/lists'), enabled });
+  return { users, lists };
+}
+
+export function useSaveUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, user }: { id?: number; user: UserInput }) =>
+      id ? api<UserFull & { password?: string }>(`/api/users/${id}`, { method: 'PUT', json: user })
+        : api<UserFull & { password?: string }>('/api/users', { method: 'POST', json: user }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['users-full'] }); qc.invalidateQueries({ queryKey: ['users'] }); },
+  });
+}
+
+export function useDeleteUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api<boolean>(`/api/users/${id}`, { method: 'DELETE' }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['users-full'] }); qc.invalidateQueries({ queryKey: ['users'] }); },
+  });
+}
+
+export function useSaveRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, role }: { id?: number; role: { name: string; permissions: string[] } }) =>
+      id ? api<Role>(`/api/roles/users/${id}`, { method: 'PUT', json: role }) : api<Role>('/api/roles/users', { method: 'POST', json: role }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['roles'] }),
+  });
+}
+
+export function useDeleteRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api<boolean>(`/api/roles/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['roles'] }),
+  });
+}
+
+export function useMedia(project: number | null) {
+  return useQuery({ queryKey: key(project, 'media'), queryFn: () => api<Page<Media>>('/api/media?per_page=all') });
+}
+
+export function useUploadMedia(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData();
+      form.set('file', file);
+      return api<Media>('/api/media', { method: 'POST', body: form });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project, 'media') }),
+  });
+}
+
+export function useDeleteMedia(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api<boolean>(`/api/media/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project, 'media') }),
+  });
+}
+
+export function useBounces(project: number | null, page: number) {
+  return useQuery({
+    queryKey: key(project, 'bounces', page),
+    queryFn: () => api<Page<Bounce>>(`/api/bounces${query({ page, per_page: 30, order_by: 'created_at', order: 'desc' })}`),
+    placeholderData: (prev) => prev,
+  });
+}
+
+export function useBounceAction(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ ids, action }: { ids: number[]; action: 'delete' | 'blocklist' }) => action === 'delete'
+      ? api<boolean>(`/api/bounces${query({ id: ids })}`, { method: 'DELETE' })
+      : api<boolean>(`/api/bounces/blocklist${query({ id: ids })}`, { method: 'PUT' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
 }
