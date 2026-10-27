@@ -6,6 +6,8 @@ SELECT * FROM lists WHERE (CASE WHEN $1 = '' THEN 1=1 ELSE type=$1::list_type EN
         -- Optional list IDs based on user permission.
         WHEN $4 = TRUE THEN TRUE ELSE id = ANY($5::INT[])
     END
+    -- Optional project (0 = all projects).
+    AND ($6 = 0 OR project_id = $6)
     ORDER BY CASE WHEN $3 = 'id' THEN id END, CASE WHEN $3 = 'name' THEN name END;
 
 -- name: query-lists
@@ -40,6 +42,8 @@ ls AS (
         -- Optional list IDs based on user permission.
         WHEN $8 = TRUE THEN TRUE ELSE lists.id = ANY($9::INT[])
     END
+    -- Optional project (0 = all projects).
+    AND ($12 = 0 OR lists.project_id = $12)
     ORDER BY %order% OFFSET $10 LIMIT (CASE WHEN $11 < 1 THEN NULL ELSE $11 END)
 )
 SELECT * FROM ls ORDER BY %order%;
@@ -59,7 +63,7 @@ SELECT id, uuid, type FROM lists WHERE
     END);
 
 -- name: create-list
-INSERT INTO lists (uuid, name, type, optin, status, tags, description) VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING id;
+INSERT INTO lists (uuid, name, type, optin, status, tags, description, project_id) VALUES($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id;
 
 -- name: update-list
 WITH l AS (
@@ -71,7 +75,7 @@ WITH l AS (
         tags=$6::VARCHAR(100)[],
         description=(CASE WHEN $7 != '' THEN $7 ELSE description END),
         updated_at=NOW()
-    WHERE id = $1
+    WHERE id = $1 AND ($8 = 0 OR project_id = $8)
     RETURNING id, name
 ),
 c AS (
@@ -99,7 +103,9 @@ AND (
 AND CASE
     -- Optional list IDs based on user permission.
     WHEN $7 = TRUE THEN TRUE ELSE id = ANY($8::INT[])
-END;
+END
+-- Optional project (0 = all projects).
+AND ($9 = 0 OR project_id = $9);
 
 -- name: get-list-charts
 -- Fill missing weeks, including empty/new lists absent from the cached view.

@@ -18,10 +18,11 @@ type listType struct {
 }
 
 // GetLists gets all lists optionally filtered by type and status.
-func (c *Core) GetLists(typ, status string, getAll bool, permittedIDs []int) ([]models.List, error) {
+// projectID 0 returns lists from all projects.
+func (c *Core) GetLists(typ, status string, getAll bool, permittedIDs []int, projectID int) ([]models.List, error) {
 	out := []models.List{}
 
-	if err := c.q.GetLists.Select(&out, typ, status, "id", getAll, pq.Array(permittedIDs)); err != nil {
+	if err := c.q.GetLists.Select(&out, typ, status, "id", getAll, pq.Array(permittedIDs), projectID); err != nil {
 		c.log.Printf("error fetching lists: %v", err)
 		return nil, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.lists}", "error", pqErrMsg(err)))
@@ -44,7 +45,7 @@ func (c *Core) GetLists(typ, status string, getAll bool, permittedIDs []int) ([]
 
 // QueryLists gets multiple lists based on multiple query params. Along with the  paginated and sliced
 // results, the total number of lists in the DB is returned.
-func (c *Core) QueryLists(searchStr, typ, optin, status string, tags []string, orderBy, order string, getAll bool, permittedIDs []int, offset, limit int) ([]models.List, int, error) {
+func (c *Core) QueryLists(searchStr, typ, optin, status string, tags []string, orderBy, order string, getAll bool, permittedIDs []int, projectID, offset, limit int) ([]models.List, int, error) {
 	_ = c.refreshCache(matListSubStats, false)
 
 	if tags == nil {
@@ -62,7 +63,7 @@ func (c *Core) QueryLists(searchStr, typ, optin, status string, tags []string, o
 		out            = []models.List{}
 		queryStr, stmt = makeSearchQuery(searchStr, orderBy, order, c.q.QueryLists, listQuerySortFields)
 	)
-	if err := c.db.Select(&out, stmt, 0, "", queryStr, typ, optin, status, pq.StringArray(tags), getAll, pq.Array(permittedIDs), offset, limit); err != nil {
+	if err := c.db.Select(&out, stmt, 0, "", queryStr, typ, optin, status, pq.StringArray(tags), getAll, pq.Array(permittedIDs), offset, limit, projectID); err != nil {
 		c.log.Printf("error fetching lists: %v", err)
 		return nil, 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.lists}", "error", pqErrMsg(err)))
@@ -83,8 +84,8 @@ func (c *Core) QueryLists(searchStr, typ, optin, status string, tags []string, o
 	return out, total, nil
 }
 
-// GetList gets a list by its ID or UUID.
-func (c *Core) GetList(id int, uuid string) (models.List, error) {
+// GetList gets a list by its ID or UUID. projectID 0 matches any project.
+func (c *Core) GetList(id int, uuid string, projectID int) (models.List, error) {
 	var uu any
 	if uuid != "" {
 		uu = uuid
@@ -92,7 +93,7 @@ func (c *Core) GetList(id int, uuid string) (models.List, error) {
 
 	var res []models.List
 	queryStr, stmt := makeSearchQuery("", "", "", c.q.QueryLists, nil)
-	if err := c.db.Select(&res, stmt, id, uu, queryStr, "", "", "", pq.StringArray{}, true, nil, 0, 1); err != nil {
+	if err := c.db.Select(&res, stmt, id, uu, queryStr, "", "", "", pq.StringArray{}, true, nil, 0, 1, projectID); err != nil {
 		c.log.Printf("error fetching lists: %v", err)
 		return models.List{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.lists}", "error", pqErrMsg(err)))
@@ -172,18 +173,18 @@ func (c *Core) CreateList(l models.List) (models.List, error) {
 	// Insert and read ID.
 	var newID int
 	l.UUID = uu.String()
-	if err := c.q.CreateList.Get(&newID, l.UUID, l.Name, l.Type, l.Optin, l.Status, pq.StringArray(normalizeTags(l.Tags)), l.Description); err != nil {
+	if err := c.q.CreateList.Get(&newID, l.UUID, l.Name, l.Type, l.Optin, l.Status, pq.StringArray(normalizeTags(l.Tags)), l.Description, l.ProjectID); err != nil {
 		c.log.Printf("error creating list: %v", err)
 		return models.List{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.list}", "error", pqErrMsg(err)))
 	}
 
-	return c.GetList(newID, "")
+	return c.GetList(newID, "", l.ProjectID)
 }
 
-// UpdateList updates a given list.
+// UpdateList updates a list of the project l.ProjectID (0 = any project).
 func (c *Core) UpdateList(id int, l models.List) (models.List, error) {
-	res, err := c.q.UpdateList.Exec(id, l.Name, l.Type, l.Optin, l.Status, pq.StringArray(normalizeTags(l.Tags)), l.Description)
+	res, err := c.q.UpdateList.Exec(id, l.Name, l.Type, l.Optin, l.Status, pq.StringArray(normalizeTags(l.Tags)), l.Description, l.ProjectID)
 	if err != nil {
 		c.log.Printf("error updating list: %v", err)
 		return models.List{}, echo.NewHTTPError(http.StatusInternalServerError,
@@ -195,16 +196,16 @@ func (c *Core) UpdateList(id int, l models.List) (models.List, error) {
 			c.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.list}"))
 	}
 
-	return c.GetList(id, "")
+	return c.GetList(id, "", l.ProjectID)
 }
 
-// DeleteList deletes a list.
-func (c *Core) DeleteList(id int) error {
-	return c.DeleteLists([]int{id}, "", "", "", "", nil, true, nil)
+// DeleteList deletes a list of the given project (0 = any project).
+func (c *Core) DeleteList(id, projectID int) error {
+	return c.DeleteLists([]int{id}, "", "", "", "", nil, true, nil, projectID)
 }
 
-// DeleteLists deletes multiple lists.
-func (c *Core) DeleteLists(ids []int, query, typ, optin, status string, tags []string, getAll bool, permittedIDs []int) error {
+// DeleteLists deletes multiple lists of the given project (0 = any project).
+func (c *Core) DeleteLists(ids []int, query, typ, optin, status string, tags []string, getAll bool, permittedIDs []int, projectID int) error {
 	var queryStr string
 
 	if tags == nil {
@@ -217,7 +218,7 @@ func (c *Core) DeleteLists(ids []int, query, typ, optin, status string, tags []s
 		queryStr = makeSearchString(query)
 	}
 
-	if _, err := c.q.DeleteLists.Exec(pq.Array(ids), queryStr, typ, optin, status, pq.StringArray(tags), getAll, pq.Array(permittedIDs)); err != nil {
+	if _, err := c.q.DeleteLists.Exec(pq.Array(ids), queryStr, typ, optin, status, pq.StringArray(tags), getAll, pq.Array(permittedIDs), projectID); err != nil {
 		c.log.Printf("error deleting lists: %v", err)
 		return echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.terms.lists}", "error", pqErrMsg(err)))

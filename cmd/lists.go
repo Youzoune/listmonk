@@ -113,7 +113,7 @@ func (a *App) ViewList(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusForbidden, a.i18n.Ts("globals.messages.permissionDenied", "name", "lists"))
 	}
 
-	list, err := a.core.GetList(id, "")
+	list, err := a.core.GetList(id, "", projectID(c))
 	if err != nil {
 		return err
 	}
@@ -152,7 +152,7 @@ func (a *App) ViewList(c *echo.Context) error {
 func (a *App) ViewForms(c *echo.Context) error {
 	user := auth.GetUser(c)
 	hasAllPerm, permittedIDs := user.GetPermittedLists(auth.PermTypeGet)
-	lists, err := a.core.GetLists(models.ListTypePublic, models.ListStatusActive, hasAllPerm, permittedIDs)
+	lists, err := a.core.GetLists(models.ListTypePublic, models.ListStatusActive, hasAllPerm, permittedIDs, projectID(c))
 	if err != nil {
 		return err
 	}
@@ -189,7 +189,7 @@ func (a *App) GetList(c *echo.Context) error {
 	}
 
 	// Get the list from the DB.
-	out, err := a.core.GetList(id, "")
+	out, err := a.core.GetList(id, "", projectID(c))
 	if err != nil {
 		return err
 	}
@@ -209,6 +209,8 @@ func (a *App) CreateList(c *echo.Context) error {
 		return err
 	}
 
+	// Lists are created in the current project, whatever the request says.
+	l.ProjectID = projectID(c)
 	out, err := a.core.CreateList(l)
 	if err != nil {
 		return err
@@ -239,7 +241,8 @@ func (a *App) UpdateList(c *echo.Context) error {
 		return err
 	}
 
-	// Update the list in the DB.
+	// Update the list in the DB, only if it belongs to the current project.
+	l.ProjectID = projectID(c)
 	out, err := a.core.UpdateList(id, l)
 	if err != nil {
 		return err
@@ -260,7 +263,7 @@ func (a *App) DeleteList(c *echo.Context) error {
 
 	// Delete the list from the DB.
 	// Pass getAll=true since we've already verified permissions above.
-	if err := a.core.DeleteLists([]int{id}, "", "", "", "", nil, true, nil); err != nil {
+	if err := a.core.DeleteLists([]int{id}, "", "", "", "", nil, true, nil, projectID(c)); err != nil {
 		return err
 	}
 
@@ -305,7 +308,7 @@ func (a *App) DeleteLists(c *echo.Context) error {
 
 		// Delete the lists from the DB.
 		// Pass getAll=true since we've already verified permissions above.
-		if err := a.core.DeleteLists(ids, "", "", "", "", nil, true, nil); err != nil {
+		if err := a.core.DeleteLists(ids, "", "", "", "", nil, true, nil, projectID(c)); err != nil {
 			return err
 		}
 	} else {
@@ -322,7 +325,7 @@ func (a *App) DeleteLists(c *echo.Context) error {
 			c.FormValue("optin"),
 			c.FormValue("status"),
 			c.Request().URL.Query()["tag"],
-			hasAllPerm, permittedIDs); err != nil {
+			hasAllPerm, permittedIDs, projectID(c)); err != nil {
 			return err
 		}
 	}
@@ -346,7 +349,7 @@ func (a *App) getLists(c *echo.Context) ([]models.List, models.PageProps, error)
 	minimal := q.Get("minimal") == "true"
 	status := q.Get("status")
 	if minimal {
-		res, err := a.core.GetLists("", status, hasAllPerm, permittedIDs)
+		res, err := a.core.GetLists("", status, hasAllPerm, permittedIDs, projectID(c))
 		if err != nil {
 			return nil, models.PageProps{}, err
 		}
@@ -371,6 +374,7 @@ func (a *App) getLists(c *echo.Context) ([]models.List, models.PageProps, error)
 		q.Get("order"),
 		hasAllPerm,
 		permittedIDs,
+		projectID(c),
 		pg.Offset,
 		pg.Limit)
 	if err != nil {

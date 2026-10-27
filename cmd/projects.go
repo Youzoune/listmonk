@@ -4,9 +4,11 @@ import (
 	"net/http"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/knadh/listmonk/internal/auth"
+	"github.com/knadh/listmonk/internal/core"
 	"github.com/knadh/listmonk/models"
 	"github.com/labstack/echo/v5"
 )
@@ -16,7 +18,66 @@ var (
 	regexpProjectDomain = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
 )
 
-const projectSlugMaxLen = 64
+const (
+	projectSlugMaxLen = 64
+
+	// projectHeader carries the current project (ID or slug) on API requests.
+	// Requests without it work on the default project.
+	projectHeader = "X-Listmonk-Project"
+
+	// projectCookie is set by the React admin when switching projects so that
+	// the legacy admin pages follow the same project.
+	projectCookie = "relais_project"
+
+	projectCtxKey = "project_id"
+)
+
+// projectMiddleware resolves the request's current project from the
+// X-Listmonk-Project header (or the relais_project cookie) and checks that
+// the user can access it.
+func (a *App) projectMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		id := models.DefaultProjectID
+
+		h := strings.TrimSpace(c.Request().Header.Get(projectHeader))
+		if h == "" {
+			if ck, err := c.Cookie(projectCookie); err == nil {
+				h = strings.TrimSpace(ck.Value)
+			}
+		}
+		if h != "" {
+			if n, err := strconv.Atoi(h); err == nil && n > 0 {
+				id = n
+			} else {
+				p, err := a.core.GetProject(0, "", strings.ToLower(h))
+				if err != nil {
+					return err
+				}
+				id = p.ID
+			}
+		}
+
+		user, ok := c.Get(auth.UserHTTPCtxKey).(auth.User)
+		if !ok {
+			return echo.NewHTTPError(http.StatusForbidden, a.i18n.Ts("globals.messages.permissionDenied", "name", "{globals.terms.project}"))
+		}
+		if err := a.hasProjectAccess(user, id); err != nil {
+			return err
+		}
+
+		c.Set(projectCtxKey, id)
+		return next(c)
+	}
+}
+
+// projectID returns the request's current project. Requests that didn't go
+// through projectMiddleware (the legacy admin pages) use the default project.
+func projectID(c *echo.Context) int {
+	if id, ok := c.Get(projectCtxKey).(int); ok {
+		return id
+	}
+	return models.DefaultProjectID
+}
 
 // GetProjects returns the projects the user has access to. Users who can
 // manage projects see all of them.
@@ -170,4 +231,48 @@ func (a *App) validateProject(p models.Project) (models.Project, error) {
 	}
 
 	return p, nil
+}
+
+// entityTerms maps owned entities to their i18n names for error messages.
+var entityTerms = map[string]string{
+	core.EntityList:       "{globals.terms.list}",
+	core.EntityCampaign:   "{globals.terms.campaign}",
+	core.EntitySubscriber: "{globals.terms.subscriber}",
+	core.EntityTemplate:   "{globals.terms.template}",
+	core.EntityMedia:      "{globals.terms.media}",
+	core.EntityBounce:     "{globals.terms.bounce}",
+}
+
+// requireOwned checks that every given row belongs to the request's project.
+// Rows of other projects get the same response as missing rows (listmonk
+// answers 400 for those) so that their existence doesn't leak across projects.
+func (a *App) requireOwned(c *echo.Context, entity string, ids ...int) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	owned, err := a.core.FilterOwned(entity, ids, projectID(c))
+	if err != nil {
+		return err
+	}
+
+	for _, id := range ids {
+		if !slices.Contains(owned, id) {
+			return echo.NewHTTPError(http.StatusBadRequest,
+				a.i18n.Ts("globals.messages.notFound", "name", entityTerms[entity]))
+		}
+	}
+
+	return nil
+}
+
+// owned wraps a handler for an /:id route so that it only runs when the
+// row belongs to the request's project.
+func (a *App) owned(entity string, next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		if err := a.requireOwned(c, entity, getID(c)); err != nil {
+			return err
+		}
+		return next(c)
+	}
 }

@@ -36,7 +36,7 @@ DROP TABLE IF EXISTS subscribers CASCADE;
 CREATE TABLE subscribers (
     id              SERIAL PRIMARY KEY,
     uuid uuid       NOT NULL UNIQUE,
-    project_id      INTEGER NOT NULL DEFAULT 1 REFERENCES projects(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    project_id      INTEGER NOT NULL REFERENCES projects(id) ON DELETE RESTRICT ON UPDATE CASCADE,
     email           TEXT NOT NULL,
     name            TEXT NOT NULL,
     attribs         JSONB NOT NULL DEFAULT '{}',
@@ -57,7 +57,7 @@ DROP INDEX IF EXISTS idx_subs_updated_at; CREATE INDEX idx_subs_updated_at ON su
 DROP TABLE IF EXISTS lists CASCADE;
 CREATE TABLE lists (
     id              SERIAL PRIMARY KEY,
-    project_id      INTEGER NOT NULL DEFAULT 1 REFERENCES projects(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    project_id      INTEGER NOT NULL REFERENCES projects(id) ON DELETE RESTRICT ON UPDATE CASCADE,
     uuid            uuid NOT NULL UNIQUE,
     name            TEXT NOT NULL,
     type            list_type NOT NULL,
@@ -100,7 +100,7 @@ CREATE INDEX IF NOT EXISTS idx_sub_lists_unsubscribed_updated_at ON subscriber_l
 DROP TABLE IF EXISTS templates CASCADE;
 CREATE TABLE templates (
     id              SERIAL PRIMARY KEY,
-    project_id      INTEGER NOT NULL DEFAULT 1 REFERENCES projects(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    project_id      INTEGER NOT NULL REFERENCES projects(id) ON DELETE RESTRICT ON UPDATE CASCADE,
     name            TEXT NOT NULL,
     type            template_type NOT NULL DEFAULT 'campaign',
     subject         TEXT NOT NULL,
@@ -111,7 +111,8 @@ CREATE TABLE templates (
     created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-CREATE UNIQUE INDEX ON templates (is_default) WHERE is_default = true;
+-- One default template per project.
+DROP INDEX IF EXISTS idx_tpl_project_default; CREATE UNIQUE INDEX idx_tpl_project_default ON templates (project_id) WHERE is_default = true;
 DROP INDEX IF EXISTS idx_tpl_project_id; CREATE INDEX idx_tpl_project_id ON templates(project_id);
 
 
@@ -119,7 +120,7 @@ DROP INDEX IF EXISTS idx_tpl_project_id; CREATE INDEX idx_tpl_project_id ON temp
 DROP TABLE IF EXISTS campaigns CASCADE;
 CREATE TABLE campaigns (
     id               SERIAL PRIMARY KEY,
-    project_id       INTEGER NOT NULL DEFAULT 1 REFERENCES projects(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    project_id       INTEGER NOT NULL REFERENCES projects(id) ON DELETE RESTRICT ON UPDATE CASCADE,
     uuid uuid        NOT NULL UNIQUE,
     name             TEXT NOT NULL,
     subject          TEXT NOT NULL,
@@ -196,7 +197,7 @@ DROP INDEX IF EXISTS idx_views_date; CREATE INDEX idx_views_date ON campaign_vie
 DROP TABLE IF EXISTS media CASCADE;
 CREATE TABLE media (
     id               SERIAL PRIMARY KEY,
-    project_id       INTEGER NOT NULL DEFAULT 1 REFERENCES projects(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    project_id       INTEGER NOT NULL REFERENCES projects(id) ON DELETE RESTRICT ON UPDATE CASCADE,
     uuid uuid        NOT NULL UNIQUE,
     provider         TEXT NOT NULL DEFAULT '',
     filename         TEXT NOT NULL,
@@ -402,6 +403,40 @@ CREATE TABLE user_projects (
     PRIMARY KEY(user_id, project_id)
 );
 DROP INDEX IF EXISTS idx_user_projects_project_id; CREATE INDEX idx_user_projects_project_id ON user_projects(project_id);
+
+-- Subscriptions and campaign lists can only link rows of the same project.
+-- Rows that would cross projects are silently skipped. Handlers check
+-- ownership and report errors; this is the last line of defence.
+CREATE OR REPLACE FUNCTION same_project_list() RETURNS TRIGGER AS $$
+DECLARE
+    owner_project INT;
+BEGIN
+    IF NEW.list_id IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    IF TG_TABLE_NAME = 'subscriber_lists' THEN
+        SELECT project_id INTO owner_project FROM subscribers WHERE id = NEW.subscriber_id;
+    ELSE
+        SELECT project_id INTO owner_project FROM campaigns WHERE id = NEW.campaign_id;
+    END IF;
+
+    IF owner_project IS DISTINCT FROM (SELECT project_id FROM lists WHERE id = NEW.list_id) THEN
+        RETURN NULL;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_sub_lists_same_project ON subscriber_lists;
+CREATE TRIGGER trg_sub_lists_same_project BEFORE INSERT OR UPDATE OF subscriber_id, list_id ON subscriber_lists
+    FOR EACH ROW EXECUTE FUNCTION same_project_list();
+
+DROP TRIGGER IF EXISTS trg_camp_lists_same_project ON campaign_lists;
+CREATE TRIGGER trg_camp_lists_same_project BEFORE INSERT OR UPDATE OF campaign_id, list_id ON campaign_lists
+    FOR EACH ROW EXECUTE FUNCTION same_project_list();
+
 
 -- materialized views
 

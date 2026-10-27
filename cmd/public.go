@@ -206,8 +206,9 @@ func jsonForTpl(v any) template.JS {
 // GetPublicLists returns the list of public lists with minimal fields
 // required to submit a subscription.
 func (a *App) GetPublicLists(c *echo.Context) error {
-	// Get all public lists.
-	lists, err := a.core.GetLists(models.ListTypePublic, models.ListStatusActive, true, nil)
+	// Public lists of the default project. Per-project public pages come with
+	// project domains (YZN-214, lot 5).
+	lists, err := a.core.GetLists(models.ListTypePublic, models.ListStatusActive, true, nil, models.DefaultProjectID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, a.i18n.T("public.errorFetchingLists"))
 	}
@@ -248,7 +249,7 @@ func (a *App) ViewCampaignMessage(c *echo.Context) error {
 
 	// Get the subscriber.
 	subUUID := c.Param("subUUID")
-	sub, err := a.core.GetSubscriber(0, subUUID, "")
+	sub, err := a.core.GetSubscriber(0, subUUID, "", 0)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return c.Render(http.StatusNotFound, tplMessage,
@@ -289,7 +290,7 @@ func (a *App) SubscriptionPage(c *echo.Context) error {
 	)
 
 	// Get the subscriber from the DB.
-	s, err := a.core.GetSubscriber(0, subUUID, "")
+	s, err := a.core.GetSubscriber(0, subUUID, "", 0)
 	if err != nil {
 		return c.Render(http.StatusInternalServerError, tplMessage,
 			makeMsgTpl(a.i18n.T("globals.terms.error"), "", a.i18n.Ts("public.errorProcessingRequest")))
@@ -381,7 +382,7 @@ func (a *App) SubscriptionPrefs(c *echo.Context) error {
 	}
 
 	// Get the subscriber from the DB.
-	sub, err := a.core.GetSubscriber(0, subUUID, "")
+	sub, err := a.core.GetSubscriber(0, subUUID, "", 0)
 	if err != nil {
 		return c.Render(http.StatusInternalServerError, tplMessage,
 			makeMsgTpl(a.i18n.T("globals.terms.error"), "", a.i18n.Ts("globals.messages.notFound",
@@ -513,8 +514,8 @@ func (a *App) SubscriptionFormPage(c *echo.Context) error {
 			makeMsgTpl(a.i18n.T("globals.terms.error"), "", a.i18n.Ts("public.invalidFeature")))
 	}
 
-	// Get all public lists from the DB.
-	lists, err := a.core.GetLists(models.ListTypePublic, models.ListStatusActive, true, nil)
+	// Public lists of the default project (see GetPublicLists).
+	lists, err := a.core.GetLists(models.ListTypePublic, models.ListStatusActive, true, nil, models.DefaultProjectID)
 	if err != nil {
 		return c.Render(http.StatusInternalServerError, tplMessage,
 			makeMsgTpl(a.i18n.T("globals.terms.error"), "", a.i18n.Ts("public.errorFetchingLists")))
@@ -857,11 +858,22 @@ func (a *App) processSubForm(c *echo.Context) (bool, error) {
 		}
 	}
 
+	// The subscriber belongs to the project of the lists, which must all be in the same project.
+	projects, err := a.core.GetListsProjects(req.FormListUUIDs)
+	if err != nil {
+		return false, err
+	}
+	if len(projects) != 1 {
+		return false, echo.NewHTTPError(http.StatusBadRequest, a.i18n.T("projects.listsAcrossProjects"))
+	}
+	projectID := projects[0]
+
 	// Insert the subscriber into the DB.
 	_, hasOptin, err := a.core.InsertSubscriber(models.Subscriber{
-		Name:   req.Name,
-		Email:  req.Email,
-		Status: models.SubscriberStatusEnabled,
+		Name:      req.Name,
+		Email:     req.Email,
+		Status:    models.SubscriberStatusEnabled,
+		ProjectID: projectID,
 	}, nil, listUUIDs, false, true)
 	if err == nil {
 		return hasOptin, nil
@@ -873,7 +885,7 @@ func (a *App) processSubForm(c *echo.Context) (bool, error) {
 	// Subscriber already exists. Update subscriptions in the DB.
 	if e, ok := err.(*echo.HTTPError); ok && e.Code == http.StatusConflict {
 		// Get the subscriber from the DB by their email.
-		sub, err := a.core.GetSubscriber(0, "", req.Email)
+		sub, err := a.core.GetSubscriber(0, "", req.Email, projectID)
 		if err != nil {
 			return false, err
 		}

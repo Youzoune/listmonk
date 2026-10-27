@@ -20,7 +20,16 @@ SELECT projects.*,
     END;
 
 -- name: create-project
-INSERT INTO projects (uuid, name, slug, domain, description) VALUES($1, $2, $3, NULLIF($4, ''), $5) RETURNING id;
+-- A new project starts with a copy of the default project's default template.
+WITH p AS (
+    INSERT INTO projects (uuid, name, slug, domain, description) VALUES($1, $2, $3, NULLIF($4, ''), $5) RETURNING id
+),
+t AS (
+    INSERT INTO templates (project_id, name, type, subject, body, body_source, is_default)
+        SELECT (SELECT id FROM p), name, type, subject, body, body_source, true
+        FROM templates WHERE project_id = 1 AND is_default = true
+)
+SELECT id FROM p;
 
 -- name: update-project
 UPDATE projects SET
