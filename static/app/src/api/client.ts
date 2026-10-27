@@ -64,6 +64,20 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
   return data.data as T;
 }
 
+// Like api(), for endpoints that answer with HTML (template and campaign previews).
+export async function apiHTML(path: string, form: Record<string, string>): Promise<string> {
+  const headers = new Headers({ 'Content-Type': 'application/x-www-form-urlencoded' });
+  if (currentProject !== null) headers.set(PROJECT_HEADER, String(currentProject));
+  const res = await fetch(path, { method: 'POST', headers, body: new URLSearchParams(form), credentials: 'same-origin' });
+  const text = await res.text();
+  if (!res.ok) {
+    let message = `Erreur ${res.status}`;
+    try { message = JSON.parse(text).message || message; } catch { /* HTML error */ }
+    throw new ApiError(res.status, message);
+  }
+  return text;
+}
+
 export function query(params: Record<string, string | number | boolean | undefined | (string | number)[]>) {
   const q = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {

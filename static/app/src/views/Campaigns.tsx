@@ -101,7 +101,7 @@ export function Campaigns() {
                 {res.data.results.map((c) => (
                   <tr key={c.id}>
                     <td>
-                      <a className="strong plain-link" href={`/admin/campaigns/${c.id}`}>{c.name}</a>
+                      <Link className="strong plain-link" to={`/campagnes/${c.id}`}>{c.name}</Link>
                       <span className="sub">{c.subject}</span>
                     </td>
                     <td>

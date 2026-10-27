@@ -36,10 +36,19 @@ cd tests && bun playwright test specs/app.spec.js   # parcours e2e sur /app
 
 ## Où on en est
 
-* Faits : Aujourd'hui, Campagnes (filtres, recherche, pagination), Nouvelle campagne (assistant en 4 étapes, lancement ou planification),
-  Audience (listes, filtres, recherche), Relais d'envoi, Projets, Identité.
-* La connexion passe encore par la page de l'ancienne admin (`/admin/login`), qui gère déjà la double authentification et OIDC.
-* L'édition détaillée d'une campagne, d'un contact et les réglages ouvrent encore l'ancienne admin.
-* L'en-tête de projet est envoyé, mais l'API ne filtre pas encore par projet : c'est le lot 2.
-* Relais d'envoi (lot 4) : projet, cadence, plage d'envoi, warm-up et relais système réglables ; estimation de fin
-  dans l'assistant de campagne ; usage du jour sur l'accueil.
+| Écran | Adresse |
+|---|---|
+| Aujourd'hui, Campagnes, Nouvelle campagne | `/`, `/campagnes`, `/campagnes/nouvelle` |
+| Fiche campagne : contenu avec mise en forme (gras, liens, titres, listes, images), aperçu, test, lancement, pause, programmation, duplication, statistiques | `/campagnes/:id` |
+| Audience (recherche, recherche SQL, export CSV), fiche contact, import CSV, listes, rebonds, formulaire d'inscription | `/audience`, `/audience/:id`, `/audience/import`, `/listes`, `/rebonds`, `/formulaire` |
+| Modèles (code HTML et aperçu en direct), médias | `/modeles`, `/medias` |
+| Relais d'envoi, Projets, Guide de l'envoi, Identité | `/relais`, `/projets`, `/guide`, `/marque` |
+| Équipe : utilisateurs, rôles et rôles sur les listes | `/equipe` |
+| Réglages : général, SMTP (préréglages OVH, Google, Microsoft, Brevo…), vitesse, confidentialité et domaines, sécurité et OIDC, rebonds (boîte POP3, webhooks des prestataires), médias, autres canaux, apparence, performances | `/reglages` |
+| Maintenance : nettoyage, journal du serveur | `/maintenance` |
+
+* Après connexion on arrive sur `/app`. La page de connexion reste celle du serveur (`/admin/login`) : elle gère déjà
+  la double authentification et OIDC.
+* Les mots de passe enregistrés ne repartent jamais vers le navigateur : un champ vide garde le mot de passe existant.
+* Encore seulement dans l'ancienne interface (`/admin`) : les modèles visuels (éditeur par blocs) et le CSS de l'ancienne
+  interface elle-même. Une campagne écrite ailleurs avec une mise en forme que Relais ne sait pas relire s'édite en HTML.

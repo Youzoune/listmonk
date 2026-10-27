@@ -10,14 +10,25 @@ import { ApiError } from './api/client';
 import { Shell } from './components/Shell';
 import { ProjectProvider } from './project';
 import { Audience } from './views/Audience';
+import { Bounces } from './views/Bounces';
+import { Maintenance } from './views/Maintenance';
+import { MediaLibrary } from './views/MediaLibrary';
+import { Users } from './views/Users';
 import { Brand } from './views/Brand';
+import { CampaignDetail } from './views/CampaignDetail';
 import { Campaigns } from './views/Campaigns';
 import { Guide } from './views/Guide';
 import { Home } from './views/Home';
+import { Import } from './views/Import';
+import { Lists } from './views/Lists';
+import { SubscriberEdit } from './views/SubscriberEdit';
 import { NewCampaign } from './views/NewCampaign';
 import { ProjectEdit } from './views/ProjectEdit';
 import { Projects } from './views/Projects';
 import { Relays } from './views/Relays';
+import { Settings } from './views/Settings';
+import { SignupForm } from './views/SignupForm';
+import { TemplateEdit, Templates } from './views/Templates';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,11 +58,25 @@ const router = createBrowserRouter(
         { index: true, element: <Home /> },
         { path: 'campagnes', element: <Campaigns /> },
         { path: 'campagnes/nouvelle', element: <NewCampaign /> },
+        { path: 'campagnes/:id', element: <CampaignDetail /> },
         { path: 'audience', element: <Audience /> },
+        { path: 'audience/nouveau', element: <SubscriberEdit /> },
+        { path: 'audience/import', element: <Import /> },
+        { path: 'audience/:id', element: <SubscriberEdit /> },
+        { path: 'listes', element: <Lists /> },
+        { path: 'formulaire', element: <SignupForm /> },
+        { path: 'rebonds', element: <Bounces /> },
+        { path: 'medias', element: <MediaLibrary /> },
+        { path: 'equipe', element: <Users /> },
+        { path: 'maintenance', element: <Maintenance /> },
         { path: 'relais', element: <Relays /> },
         { path: 'projets', element: <Projects /> },
         { path: 'projets/nouveau', element: <ProjectEdit /> },
         { path: 'projets/:id', element: <ProjectEdit /> },
+        { path: 'modeles', element: <Templates /> },
+        { path: 'modeles/nouveau', element: <TemplateEdit /> },
+        { path: 'modeles/:id', element: <TemplateEdit /> },
+        { path: 'reglages', element: <Settings /> },
         { path: 'guide', element: <Guide /> },
         { path: 'marque', element: <Brand /> },
         { path: '*', element: <NotFound /> },

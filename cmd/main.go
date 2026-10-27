@@ -203,6 +203,7 @@ func init() {
 	}
 	if envRootURL != "" {
 		applyEnvRootURL(envRootURL, db, ko)
+		rootURLFromEnv = true
 	}
 
 	// Prepare queries.

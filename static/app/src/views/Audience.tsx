@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
+import { query } from '../api/client';
 import { useLists, useSubscribers } from '../api/hooks';
 import type { Subscriber } from '../api/types';
-import { Chip, ErrorState, Icon, Loading, Pager } from '../components/ui';
+import { Chip, ErrorState, Field, Icon, Loading, Pager } from '../components/ui';
 import { date, num } from '../lib/format';
 import { useProject } from '../project';
 
@@ -32,6 +33,10 @@ export function Audience() {
   const listId = Number(params.get('liste')) || undefined;
   const page = Number(params.get('page')) || 1;
   const [q, setQ] = useState(params.get('q') ?? '');
+  const sql = params.get('sql') ?? '';
+  const [sqlDraft, setSqlDraft] = useState(sql);
+  const [advanced, setAdvanced] = useState(!!sql);
+  const canSql = can('subscribers:sql_query');
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -52,7 +57,7 @@ export function Audience() {
   };
 
   const lists = useLists(project.id);
-  const subs = useSubscribers(project.id, { search: params.get('q') ?? '', status, listId, page, perPage: PER_PAGE });
+  const subs = useSubscribers(project.id, { search: params.get('q') ?? '', sql: canSql ? sql : '', status, listId, page, perPage: PER_PAGE });
   const activeLists = (lists.data?.results ?? []).filter((l) => l.status === 'active');
 
   return (
@@ -62,7 +67,12 @@ export function Audience() {
           <p className="eyebrow">{project.name}</p>
           <h1>Audience</h1>
         </div>
-        {can('subscribers:import') && <a className="btn" href="/admin/subscribers/import">Importer un fichier</a>}
+        <div className="row-gap">
+          <Link className="btn" to="/listes">Gérer les listes</Link>
+          {can('bounces:get') && <Link className="btn btn-ghost" to="/rebonds">Rebonds</Link>}
+          {can('subscribers:import') && <Link className="btn" to="/audience/import">Importer un fichier</Link>}
+          {can('subscribers:manage') && <Link className="btn btn-primary" to="/audience/nouveau"><Icon name="plus" /> Nouveau contact</Link>}
+        </div>
       </header>
 
       {lists.isError ? <ErrorState error={lists.error} /> : (
@@ -92,11 +102,35 @@ export function Audience() {
           <Icon name="search" />
           <input id="aud-search" type="search" placeholder="Nom ou e-mail" value={q} onChange={(e) => setQ(e.target.value)} />
         </label>
+        {canSql && (
+          <button type="button" className="btn btn-sm btn-ghost" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>Recherche avancée</button>
+        )}
       </div>
+      {canSql && advanced && (
+        <form className="panel sql-search" onSubmit={(e) => { e.preventDefault(); set('sql', sqlDraft.trim() || null); }}>
+          <Field id="aud-sql" label="Condition SQL sur les contacts"
+            hint={<>Par exemple <span className="mono">subscribers.attribs-&gt;&gt;'ville' = 'Rouen'</span> ou <span className="mono">subscribers.created_at &gt; NOW() - INTERVAL '30 days'</span>.</>}>
+            <textarea id="aud-sql" rows={2} className="mono" spellCheck={false} value={sqlDraft} onChange={(e) => setSqlDraft(e.target.value)} />
+          </Field>
+          <div className="row-gap end">
+            {sql && <button type="button" className="btn btn-sm btn-ghost" onClick={() => { setSqlDraft(''); set('sql', null); }}>Effacer</button>}
+            <button type="submit" className="btn btn-sm btn-dark">Rechercher</button>
+          </div>
+        </form>
+      )}
 
       {subs.isPending ? <Loading /> : subs.isError ? <ErrorState error={subs.error} retry={() => subs.refetch()} /> : (
         <>
-          <p className="small muted num">{num(subs.data.total)} contact{subs.data.total > 1 ? 's' : ''}</p>
+          <div className="row-gap between">
+            <p className="small muted num">{num(subs.data.total)} contact{subs.data.total > 1 ? 's' : ''}</p>
+            {subs.data.total > 0 && (
+              // The project travels in the relais_project cookie, so a plain link downloads the file.
+              <a className="btn btn-sm btn-ghost" download
+                href={`/api/subscribers/export${query({ search: params.get('q') ?? '', query: canSql ? sql : '', status, list_id: listId })}`}>
+                Exporter en CSV
+              </a>
+            )}
+          </div>
           <div className="table-wrap">
             <table className="table">
               <thead>
@@ -112,7 +146,7 @@ export function Audience() {
                 {subs.data.results.map((s) => (
                   <tr key={s.id}>
                     <td>
-                      <a className="strong plain-link" href={`/admin/subscribers/${s.id}`}>{s.name}</a>
+                      <Link className="strong plain-link" to={`/audience/${s.id}`}>{s.name}</Link>
                       <span className="sub mono">{s.email}</span>
                     </td>
                     <td>

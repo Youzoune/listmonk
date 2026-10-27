@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, query } from './client';
+import { ApiError, api, query } from './client';
 import type {
   Campaign, CampaignStatus, DashboardCharts, DashboardCounts, List, NewCampaign, Page, Profile, Project,
-  ProjectInput, Relay, RelayInput, ServerConfig, Settings, Subscriber, User,
+  AnalyticsCount, AnalyticsLink, Bounce, ListRole, Media, Role, UserFull, UserInput, ImportParams, ImportStatus, ListInput, ProjectInput, Relay, RelayInput, ServerConfig, Settings, SmtpServer, Subscriber, SubscriberInput, Template, TemplateInput, User,
 } from './types';
 
 // Query keys start with the project so that switching project refetches everything.
@@ -47,9 +47,10 @@ export function useLists(project: number | null) {
   });
 }
 
-export function useSubscribers(project: number | null, opts: { search?: string; status?: string; listId?: number; page?: number; perPage?: number }) {
+export function useSubscribers(project: number | null, opts: { search?: string; sql?: string; status?: string; listId?: number; page?: number; perPage?: number }) {
   const q = query({
     search: opts.search,
+    query: opts.sql,
     status: opts.status,
     list_id: opts.listId,
     page: opts.page ?? 1,
@@ -62,6 +63,41 @@ export function useSubscribers(project: number | null, opts: { search?: string; 
 
 export function useSettings(enabled: boolean) {
   return useQuery({ queryKey: ['settings'], queryFn: () => api<Settings>('/api/settings'), enabled });
+}
+
+// Waits for the server to answer again after it reloaded its settings.
+export async function waitForReload(timeoutMs = 20_000) {
+  await new Promise((r) => setTimeout(r, 800));
+  const end = Date.now() + timeoutMs;
+  while (Date.now() < end) {
+    try {
+      const res = await fetch('/api/health', { credentials: 'same-origin' });
+      if (res.ok) return;
+    } catch { /* restarting */ }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
+
+// Saves the whole settings object. The server reloads to apply it, unless
+// campaigns are sending (needs_restart).
+export function useSaveSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (settings: Settings) => {
+      const out = await api<true | { needs_restart: boolean }>('/api/settings', { method: 'PUT', json: settings });
+      await waitForReload();
+      return out;
+    },
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+// Sends a test e-mail through an SMTP server, saved or not.
+export function useTestSmtp() {
+  return useMutation({
+    mutationFn: ({ server, email }: { server: SmtpServer; email: string }) =>
+      api<string[]>('/api/settings/smtp/test', { method: 'POST', json: { ...server, email } }),
+  });
 }
 
 export function useCreateCampaign(project: number | null) {
@@ -146,5 +182,271 @@ export function useSaveRelay(project: number | null) {
       api<true | { needs_restart: boolean }>(`/api/relays/${uuid}`, { method: 'PUT', json: relay }),
     // Give the server a moment to reload before reading the relays again.
     onSuccess: () => setTimeout(() => qc.invalidateQueries({ queryKey: key(project, 'relays') }), 1500),
+  });
+}
+
+export function useTemplates(project: number | null) {
+  return useQuery({ queryKey: key(project, 'templates'), queryFn: () => api<Template[]>('/api/templates?no_body=true') });
+}
+
+export function useTemplate(project: number | null, id: number | null) {
+  return useQuery({ queryKey: key(project, 'template', id), queryFn: () => api<Template>(`/api/templates/${id}`), enabled: !!id });
+}
+
+export function useSaveTemplate(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, tpl }: { id?: number; tpl: TemplateInput }) =>
+      id ? api<Template>(`/api/templates/${id}`, { method: 'PUT', json: tpl }) : api<Template>('/api/templates', { method: 'POST', json: tpl }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
+}
+
+export function useTemplateAction(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, action }: { id: number; action: 'default' | 'delete' }) =>
+      action === 'delete' ? api<boolean>(`/api/templates/${id}`, { method: 'DELETE' }) : api<unknown>(`/api/templates/${id}/default`, { method: 'PUT' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
+}
+
+export function useSaveList(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, list }: { id?: number; list: ListInput }) =>
+      id ? api<List>(`/api/lists/${id}`, { method: 'PUT', json: list }) : api<List>('/api/lists', { method: 'POST', json: list }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
+}
+
+export function useDeleteList(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api<boolean>(`/api/lists/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
+}
+
+export function useSubscriber(project: number | null, id: number | null) {
+  return useQuery({ queryKey: key(project, 'subscriber', id), queryFn: () => api<Subscriber>(`/api/subscribers/${id}`), enabled: !!id });
+}
+
+export function useSaveSubscriber(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, sub }: { id?: number; sub: SubscriberInput }) =>
+      id ? api<Subscriber>(`/api/subscribers/${id}`, { method: 'PUT', json: sub }) : api<Subscriber>('/api/subscribers', { method: 'POST', json: sub }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
+}
+
+export function useDeleteSubscriber(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api<boolean>(`/api/subscribers/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
+}
+
+// The importer is one per instance: its status is polled while it runs.
+export function useImportStatus(enabled: boolean) {
+  return useQuery({
+    queryKey: ['import-status'],
+    queryFn: () => api<ImportStatus>('/api/import/subscribers'),
+    enabled,
+    refetchInterval: (q) => (q.state.data?.status === 'importing' || q.state.data?.status === 'stopping' ? 1000 : false),
+  });
+}
+
+export function useImportLogs(enabled: boolean) {
+  return useQuery({ queryKey: ['import-logs'], queryFn: () => api<string>('/api/import/subscribers/logs'), enabled, refetchInterval: enabled ? 2000 : false });
+}
+
+export function useStartImport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ file, params }: { file: File; params: ImportParams }) => {
+      const form = new FormData();
+      form.set('params', JSON.stringify(params));
+      form.set('file', file);
+      // FormData needs the browser to set the multipart boundary itself.
+      return api<ImportStatus>('/api/import/subscribers', { method: 'POST', body: form });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['import-status'] }),
+  });
+}
+
+export function useStopImport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<ImportStatus>('/api/import/subscribers', { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export const isNotFound = (e: unknown) => e instanceof ApiError && (e.status === 404 || e.status === 400);
+
+export function useCampaign(project: number | null, id: number | null) {
+  return useQuery({
+    queryKey: key(project, 'campaign', id),
+    queryFn: () => api<Campaign>(`/api/campaigns/${id}`),
+    enabled: !!id,
+    // A running campaign's counters move.
+    refetchInterval: (q) => (q.state.data?.status === 'running' ? 5000 : false),
+  });
+}
+
+// PUT takes the whole campaign: send it back with the changes.
+export function useSaveCampaign(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, campaign }: { id: number; campaign: Record<string, unknown> }) =>
+      api<Campaign>(`/api/campaigns/${id}`, { method: 'PUT', json: campaign }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
+}
+
+export function useCampaignStatus(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: number; status: CampaignStatus }) =>
+      api<Campaign>(`/api/campaigns/${id}/status`, { method: 'PUT', json: { status } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
+}
+
+export function useDeleteCampaign(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api<boolean>(`/api/campaigns/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
+}
+
+export function useCloneCampaign(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (c: Campaign) => api<Campaign>('/api/campaigns', {
+      method: 'POST',
+      json: {
+        name: `Copie de ${c.name}`, subject: c.subject, from_email: c.from_email, lists: c.lists.map((l) => l.id),
+        messenger: c.messenger, content_type: c.content_type, body: c.body, tags: c.tags, template_id: c.template_id ?? undefined,
+      },
+    }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
+}
+
+// Sends the campaign, as currently edited, to contacts of the project.
+export function useTestCampaign() {
+  return useMutation({
+    mutationFn: ({ id, campaign, emails }: { id: number; campaign: Record<string, unknown>; emails: string[] }) =>
+      api<boolean>(`/api/campaigns/${id}/test`, { method: 'POST', json: { ...campaign, subscribers: emails } }),
+  });
+}
+
+export function useCampaignAnalytics(project: number | null, id: number | null, range: { from: string; to: string } | null) {
+  const q = (type: string) => `/api/campaigns/analytics/${type}${query({ id: id ?? 0, from: range?.from, to: range?.to })}`;
+  const enabled = !!id && !!range;
+  const views = useQuery({ queryKey: key(project, 'camp-views', id, range), queryFn: () => api<AnalyticsCount[]>(q('views')), enabled });
+  const clicks = useQuery({ queryKey: key(project, 'camp-clicks', id, range), queryFn: () => api<AnalyticsCount[]>(q('clicks')), enabled });
+  const links = useQuery({ queryKey: key(project, 'camp-links', id, range), queryFn: () => api<AnalyticsLink[]>(q('links')), enabled });
+  return { views, clicks, links };
+}
+
+export function useUsersFull(enabled: boolean) {
+  return useQuery({ queryKey: ['users-full'], queryFn: () => api<UserFull[]>('/api/users'), enabled });
+}
+
+export function useRoles(enabled: boolean) {
+  const users = useQuery({ queryKey: ['roles', 'users'], queryFn: () => api<Role[]>('/api/roles/users'), enabled });
+  const lists = useQuery({ queryKey: ['roles', 'lists'], queryFn: () => api<ListRole[]>('/api/roles/lists'), enabled });
+  return { users, lists };
+}
+
+export function useSaveUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, user }: { id?: number; user: UserInput }) =>
+      id ? api<UserFull & { password?: string }>(`/api/users/${id}`, { method: 'PUT', json: user })
+        : api<UserFull & { password?: string }>('/api/users', { method: 'POST', json: user }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['users-full'] }); qc.invalidateQueries({ queryKey: ['users'] }); },
+  });
+}
+
+export function useDeleteUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api<boolean>(`/api/users/${id}`, { method: 'DELETE' }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['users-full'] }); qc.invalidateQueries({ queryKey: ['users'] }); },
+  });
+}
+
+export function useSaveRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, role }: { id?: number; role: { name: string; permissions: string[] } }) =>
+      id ? api<Role>(`/api/roles/users/${id}`, { method: 'PUT', json: role }) : api<Role>('/api/roles/users', { method: 'POST', json: role }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['roles'] }),
+  });
+}
+
+export function useSaveListRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, role }: { id?: number; role: { name: string; lists: { id: number; permissions: string[] }[] } }) =>
+      id ? api<ListRole>(`/api/roles/lists/${id}`, { method: 'PUT', json: role }) : api<ListRole>('/api/roles/lists', { method: 'POST', json: role }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['roles'] }); qc.invalidateQueries({ queryKey: ['users-full'] }); },
+  });
+}
+
+export function useDeleteRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api<boolean>(`/api/roles/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['roles'] }),
+  });
+}
+
+export function useMedia(project: number | null, enabled = true) {
+  return useQuery({ queryKey: key(project, 'media'), queryFn: () => api<Page<Media>>('/api/media?per_page=all'), enabled });
+}
+
+export function useUploadMedia(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData();
+      form.set('file', file);
+      return api<Media>('/api/media', { method: 'POST', body: form });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project, 'media') }),
+  });
+}
+
+export function useDeleteMedia(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api<boolean>(`/api/media/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project, 'media') }),
+  });
+}
+
+export function useBounces(project: number | null, page: number) {
+  return useQuery({
+    queryKey: key(project, 'bounces', page),
+    queryFn: () => api<Page<Bounce>>(`/api/bounces${query({ page, per_page: 30, order_by: 'created_at', order: 'desc' })}`),
+    placeholderData: (prev) => prev,
+  });
+}
+
+export function useBounceAction(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ ids, action }: { ids: number[]; action: 'delete' | 'blocklist' }) => action === 'delete'
+      ? api<boolean>(`/api/bounces${query({ id: ids })}`, { method: 'DELETE' })
+      : api<boolean>(`/api/bounces/blocklist${query({ id: ids })}`, { method: 'PUT' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
   });
 }
