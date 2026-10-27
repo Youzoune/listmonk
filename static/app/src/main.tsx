@@ -12,6 +12,7 @@ import { ProjectProvider } from './project';
 import { Audience } from './views/Audience';
 import { Bounces } from './views/Bounces';
 import { Maintenance } from './views/Maintenance';
+import { Account } from './views/Account';
 import { MediaLibrary } from './views/MediaLibrary';
 import { Users } from './views/Users';
 import { Brand } from './views/Brand';
@@ -26,6 +27,7 @@ import { NewCampaign } from './views/NewCampaign';
 import { ProjectEdit } from './views/ProjectEdit';
 import { Projects } from './views/Projects';
 import { Relays } from './views/Relays';
+import { NewRelay } from './views/NewRelay';
 import { Settings } from './views/Settings';
 import { SignupForm } from './views/SignupForm';
 import { TemplateEdit, Templates } from './views/Templates';
@@ -69,7 +71,9 @@ const router = createBrowserRouter(
         { path: 'medias', element: <MediaLibrary /> },
         { path: 'equipe', element: <Users /> },
         { path: 'maintenance', element: <Maintenance /> },
+        { path: 'compte', element: <Account /> },
         { path: 'relais', element: <Relays /> },
+        { path: 'relais/nouveau', element: <NewRelay /> },
         { path: 'projets', element: <Projects /> },
         { path: 'projets/nouveau', element: <ProjectEdit /> },
         { path: 'projets/:id', element: <ProjectEdit /> },

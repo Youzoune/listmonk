@@ -865,7 +865,6 @@ export function Settings() {
         </div>
         <div className="row-gap">
           <Link className="btn" to="/maintenance">Maintenance et journal</Link>
-          <a className="btn btn-ghost" href="/admin/settings"><Icon name="out" size={16} /> Ancienne interface</a>
         </div>
       </header>
 

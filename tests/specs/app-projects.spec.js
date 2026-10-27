@@ -39,7 +39,7 @@ test.describe('Relais projects', () => {
 
     await expect(page).toHaveURL(/\/app\/projets\/\d+$/);
     projectURL = new URL(page.url()).pathname;
-    await expect(page.getByRole('status')).toContainText('« Club Sport — Lyon » est créé');
+    await expect(page.getByRole('status').filter({ hasText: 'est créé' })).toContainText('« Club Sport — Lyon » est créé');
     await expect(page.getByLabel(/^Domaine( personnalisé)? \(facultatif\)$/)).toHaveValue('news.sport.example.com');
 
     // The super admin sees every project.

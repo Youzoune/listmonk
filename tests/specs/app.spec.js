@@ -24,9 +24,9 @@ test.describe('Relais app', () => {
     const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const page = await context.newPage();
     await page.goto('/admin/login');
-    await page.getByLabel('Username').fill('admin');
-    await page.getByLabel('Password').fill('listmonk');
-    await page.getByRole('button', { name: 'Login' }).click();
+    await page.getByLabel('Identifiant').fill('admin');
+    await page.getByLabel('Mot de passe').fill('listmonk');
+    await page.getByRole('button', { name: 'Se connecter' }).click();
     await expect(page).toHaveURL(new RegExp(`${APP}/?$`));
     await context.close();
   });
@@ -37,9 +37,9 @@ test.describe('Relais app', () => {
     await page.goto(`${APP}/audience`);
     await expect(page).toHaveURL(/\/admin\/login\?next=%2Fapp%2Faudience/);
 
-    await page.getByLabel('Username').fill('admin');
-    await page.getByLabel('Password').fill('listmonk');
-    await page.getByRole('button', { name: 'Login' }).click();
+    await page.getByLabel('Identifiant').fill('admin');
+    await page.getByLabel('Mot de passe').fill('listmonk');
+    await page.getByRole('button', { name: 'Se connecter' }).click();
     await expect(page).toHaveURL(/\/app\/audience$/);
     await expect(page.getByRole('heading', { name: 'Audience' })).toBeVisible();
     await context.close();
@@ -128,5 +128,22 @@ test.describe('Relais app', () => {
   test('shows a not-found page for unknown routes', async ({ page }) => {
     await page.goto(`${APP}/nimporte-quoi`);
     await expect(page.getByRole('heading', { name: 'Page introuvable' })).toBeVisible();
+  });
+
+  test('lights the section of every screen in the sidebar', async ({ page }) => {
+    const nav = page.getByRole('navigation', { name: 'Navigation principale' });
+    for (const [url, entry] of [['/listes', 'Audience'], ['/rebonds', 'Audience'], ['/formulaire', 'Audience'], ['/audience/import', 'Audience'],
+      ['/maintenance', 'Réglages'], ['/relais/nouveau', 'Relais d’envoi'], ['/campagnes/nouvelle', 'Campagnes'], ['/', 'Aujourd’hui']]) {
+      await page.goto(`${APP}${url}`);
+      await expect(nav.locator('a[aria-current="page"]')).toHaveText(entry);
+    }
+  });
+
+  test('keeps the bottom of the sidebar in view on long pages', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto(`${APP}/reglages?onglet=smtp`);
+    await page.mouse.wheel(0, 3000);
+    await expect(page.getByRole('link', { name: /Mon compte/ })).toBeInViewport();
+    await expect(page.getByRole('link', { name: 'Guide de l’envoi' })).toBeInViewport();
   });
 });

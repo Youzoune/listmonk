@@ -87,8 +87,9 @@ export function Templates() {
                     <div className="row-gap end">
                       <button type="button" className="btn btn-sm" onClick={() => setPreviewing(t)}>Aperçu</button>
                       {canEdit && t.type !== 'campaign_visual' && <Link className="btn btn-sm" to={`/modeles/${t.id}`}>Modifier</Link>}
-                      {canEdit && t.type === 'campaign_visual' && <a className="btn btn-sm" href="/admin/campaigns/templates">Modifier (ancienne interface)</a>}
-                      {canEdit && t.type !== 'campaign_visual' && <button type="button" className="btn btn-sm" onClick={() => duplicate(t)}>Dupliquer</button>}
+                      {canEdit && (t.type === 'campaign_visual'
+                        ? <button type="button" className="btn btn-sm" title="Le modèle visuel est copié en modèle HTML modifiable ici." onClick={() => duplicate(t)}>Copier en HTML</button>
+                        : <button type="button" className="btn btn-sm" onClick={() => duplicate(t)}>Dupliquer</button>)}
                       {canEdit && t.type === 'campaign' && !t.is_default && (
                         <button type="button" className="btn btn-sm" disabled={action.isPending} onClick={() => action.mutate({ id: t.id, action: 'default' })}>Par défaut</button>
                       )}
@@ -140,7 +141,9 @@ export function TemplateEdit() {
   useEffect(() => {
     if (form || !existing.data) return;
     const t = existing.data;
-    setForm({ name: isNew ? `Copie de ${t.name}` : t.name, type: t.type, subject: t.subject ?? '', body: t.body ?? '' });
+    // A visual template (block editor) is copied as an HTML campaign template.
+    const type = t.type === 'campaign_visual' ? 'campaign' : t.type;
+    setForm({ name: isNew ? `Copie de ${t.name}` : t.name, type, subject: t.subject ?? '', body: t.body ?? '' });
   }, [existing.data, form, isNew]);
 
   if (!can('templates:manage')) return <div className="view"><h1>Modèle</h1><p className="muted">Vous n’avez pas accès aux modèles.</p></div>;

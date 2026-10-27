@@ -91,3 +91,11 @@ export function forSave(s: SmtpServer): SmtpServer {
   const { password, ...rest } = s;
   return password ? { ...rest, password } : { ...rest };
 }
+
+// A free relay name from a provider id: "ovh", then "ovh-2", "ovh-3"…
+export function freeRelayName(base: string, servers: Pick<SmtpServer, 'name'>[]): string {
+  const taken = new Set(servers.map((s) => s.name.replace(/^email-/, '')));
+  const clean = base.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || 'relais';
+  if (!taken.has(clean)) return clean;
+  for (let i = 2; ; i++) if (!taken.has(`${clean}-${i}`)) return `${clean}-${i}`;
+}

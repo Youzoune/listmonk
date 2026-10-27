@@ -134,7 +134,6 @@ export function Campaigns() {
           <Pager page={page} perPage={PER_PAGE} total={res.data.total} onPage={(p) => set('page', String(p))} />
         </>
       )}
-      <p className="small muted">L’édition détaillée d’une campagne s’ouvre encore dans l’ancienne interface.</p>
     </div>
   );
 }

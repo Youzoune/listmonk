@@ -73,55 +73,62 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 		// their routes here. Unported /admin/* paths fall through to the 404 handler.
 		g.GET(path.Join(uriAdmin, "/custom.css"), serveCustomAppearance("admin.custom_css"))
 		g.GET(path.Join(uriAdmin, "/custom.js"), serveCustomAppearance("admin.custom_js"))
-		g.GET(uriAdmin, a.adminPage(a.ViewDashboard))
-
 		// React admin. Every path under it is a client-side route.
 		g.GET(uriApp, a.ServeApp)
 		g.GET(uriApp+"/*", a.ServeApp)
-		g.GET(path.Join(uriAdmin, "/lists"), a.adminPage(a.ViewLists))
-		g.GET(path.Join(uriAdmin, "/lists/analytics"), a.adminPage(a.ViewListAnalytics))
-		g.GET(path.Join(uriAdmin, "/lists/new"), a.adminPage(pm(a.ViewNewList, auth.PermListManageAll)))
-		g.GET(path.Join(uriAdmin, "/lists/:id"), a.adminPage(hasID(a.owned(core.EntityList, a.ViewList))))
-		g.GET(path.Join(uriAdmin, "/lists/:id/edit"), a.adminPage(hasID(a.owned(core.EntityList, a.ViewList))))
-		g.GET(path.Join(uriAdmin, "/lists/forms"), a.adminPage(a.ViewForms))
-		g.GET(path.Join(uriAdmin, "/campaigns"), a.adminPage(pm(a.ViewCampaigns, auth.PermCampaignsGetAll, auth.PermCampaignsGet)))
-		g.GET(path.Join(uriAdmin, "/campaigns/media"), a.adminPage(pm(a.ViewMedia, auth.PermMediaGet)))
-		g.GET(path.Join(uriAdmin, "/campaigns/media/fragment"), a.adminPage(pm(a.ViewMediaFragment, auth.PermMediaGet)))
-		g.GET(path.Join(uriAdmin, "/campaigns/analytics"), a.adminPage(pm(a.ViewCampaignAnalytics, auth.PermCampaignsGetAnalytics)))
-		g.GET(path.Join(uriAdmin, "/campaigns/new"), a.adminPage(pm(a.ViewNewCampaign, auth.PermCampaignsManageAll, auth.PermCampaignsManage)))
-		g.GET(path.Join(uriAdmin, "/campaigns/:id"), a.adminPage(pm(hasID(a.owned(core.EntityCampaign, a.ViewCampaign)), auth.PermCampaignsGetAll, auth.PermCampaignsGet)))
-		g.GET(path.Join(uriAdmin, "/campaigns/:id/:tab"), a.adminPage(pm(hasID(a.owned(core.EntityCampaign, a.ViewCampaign)), auth.PermCampaignsGetAll, auth.PermCampaignsGet)))
-		g.GET(path.Join(uriAdmin, "/templates"), a.adminPage(pm(a.ViewTemplates, auth.PermTemplatesGet)))
-		g.GET(path.Join(uriAdmin, "/templates/new"), a.adminPage(pm(a.ViewNewTemplate, auth.PermTemplatesManage)))
-		g.GET(path.Join(uriAdmin, "/templates/:id"), a.adminPage(pm(hasID(a.owned(core.EntityTemplate, a.ViewTemplate)), auth.PermTemplatesGet)))
-		g.GET(path.Join(uriAdmin, "/subscribers/import"), a.adminPage(pm(a.ViewImport, auth.PermSubscribersImport)))
-		g.GET(path.Join(uriAdmin, "/subscribers/bounces"), a.adminPage(pm(a.ViewBounces, auth.PermBouncesGet)))
-		g.GET(path.Join(uriAdmin, "/subscribers"), a.adminPage(pm(a.ViewSubscribers, auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
-		g.POST(path.Join(uriAdmin, "/subscribers"), a.adminPage(pm(a.ViewSubscribers, auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
-		g.GET(path.Join(uriAdmin, "/subscribers/lists/:id"), a.adminPage(pm(hasID(a.owned(core.EntityList, a.ViewSubscribers)), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
-		g.POST(path.Join(uriAdmin, "/subscribers/lists/:id"), a.adminPage(pm(hasID(a.owned(core.EntityList, a.ViewSubscribers)), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
-		g.GET(path.Join(uriAdmin, "/subscribers/new"), a.adminPage(pm(a.ViewNewSubscriber, auth.PermSubscribersManage)))
-		g.GET(path.Join(uriAdmin, "/subscribers/:id/edit"), a.adminPage(pm(hasID(a.owned(core.EntitySubscriber, a.ViewSubscriber)), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
-		g.GET(path.Join(uriAdmin, "/subscribers/:id"), a.adminPage(pm(hasID(a.owned(core.EntitySubscriber, a.ViewSubscriberInfo)), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
-		g.GET(path.Join(uriAdmin, "/subscribers/:id/lists"), a.adminPage(pm(hasID(a.owned(core.EntitySubscriber, a.ViewSubscriber)), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
-		g.GET(path.Join(uriAdmin, "/subscribers/:id/bounces"), a.adminPage(pm(pm(hasID(a.owned(core.EntitySubscriber, a.ViewSubscriberBounces)), auth.PermBouncesGet), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
 
-		// Users and roles. Static segments are registered before the :id param routes.
-		g.GET(path.Join(uriAdmin, "/users"), a.adminPage(pm(a.ViewUsers, auth.PermUsersGet)))
-		g.GET(path.Join(uriAdmin, "/users/new"), a.adminPage(pm(a.ViewUser, auth.PermUsersManage)))
-		g.GET(path.Join(uriAdmin, "/users/roles"), a.adminPage(pm(a.ViewUserRoles, auth.PermRolesGet)))
-		g.GET(path.Join(uriAdmin, "/users/roles/new"), a.adminPage(pm(a.ViewUserRole, auth.PermRolesManage)))
-		g.GET(path.Join(uriAdmin, "/users/roles/lists"), a.adminPage(pm(a.ViewListRoles, auth.PermRolesGet)))
-		g.GET(path.Join(uriAdmin, "/users/roles/lists/new"), a.adminPage(pm(a.ViewListRole, auth.PermRolesManage)))
-		g.GET(path.Join(uriAdmin, "/users/roles/lists/:id"), a.adminPage(pm(hasID(a.ViewListRole), auth.PermRolesGet)))
-		g.GET(path.Join(uriAdmin, "/users/roles/:id"), a.adminPage(pm(hasID(a.ViewUserRole), auth.PermRolesGet)))
-		g.GET(path.Join(uriAdmin, "/users/:id"), a.adminPage(pm(hasID(a.ViewUser), auth.PermUsersGet)))
-		g.GET(path.Join(uriAdmin, "/user/profile"), a.adminPage(a.ViewProfile))
+		// The legacy admin pages, only when explicitly enabled. Otherwise
+		// each one sends people to its Relais screen.
+		if !legacyAdmin() {
+			g.GET(uriAdmin, a.RedirectToApp)
+			g.GET(uriAdmin+"/*", a.RedirectToApp)
+		} else {
+			g.GET(uriAdmin, a.adminPage(a.ViewDashboard))
+			g.GET(path.Join(uriAdmin, "/lists"), a.adminPage(a.ViewLists))
+			g.GET(path.Join(uriAdmin, "/lists/analytics"), a.adminPage(a.ViewListAnalytics))
+			g.GET(path.Join(uriAdmin, "/lists/new"), a.adminPage(pm(a.ViewNewList, auth.PermListManageAll)))
+			g.GET(path.Join(uriAdmin, "/lists/:id"), a.adminPage(hasID(a.owned(core.EntityList, a.ViewList))))
+			g.GET(path.Join(uriAdmin, "/lists/:id/edit"), a.adminPage(hasID(a.owned(core.EntityList, a.ViewList))))
+			g.GET(path.Join(uriAdmin, "/lists/forms"), a.adminPage(a.ViewForms))
+			g.GET(path.Join(uriAdmin, "/campaigns"), a.adminPage(pm(a.ViewCampaigns, auth.PermCampaignsGetAll, auth.PermCampaignsGet)))
+			g.GET(path.Join(uriAdmin, "/campaigns/media"), a.adminPage(pm(a.ViewMedia, auth.PermMediaGet)))
+			g.GET(path.Join(uriAdmin, "/campaigns/media/fragment"), a.adminPage(pm(a.ViewMediaFragment, auth.PermMediaGet)))
+			g.GET(path.Join(uriAdmin, "/campaigns/analytics"), a.adminPage(pm(a.ViewCampaignAnalytics, auth.PermCampaignsGetAnalytics)))
+			g.GET(path.Join(uriAdmin, "/campaigns/new"), a.adminPage(pm(a.ViewNewCampaign, auth.PermCampaignsManageAll, auth.PermCampaignsManage)))
+			g.GET(path.Join(uriAdmin, "/campaigns/:id"), a.adminPage(pm(hasID(a.owned(core.EntityCampaign, a.ViewCampaign)), auth.PermCampaignsGetAll, auth.PermCampaignsGet)))
+			g.GET(path.Join(uriAdmin, "/campaigns/:id/:tab"), a.adminPage(pm(hasID(a.owned(core.EntityCampaign, a.ViewCampaign)), auth.PermCampaignsGetAll, auth.PermCampaignsGet)))
+			g.GET(path.Join(uriAdmin, "/templates"), a.adminPage(pm(a.ViewTemplates, auth.PermTemplatesGet)))
+			g.GET(path.Join(uriAdmin, "/templates/new"), a.adminPage(pm(a.ViewNewTemplate, auth.PermTemplatesManage)))
+			g.GET(path.Join(uriAdmin, "/templates/:id"), a.adminPage(pm(hasID(a.owned(core.EntityTemplate, a.ViewTemplate)), auth.PermTemplatesGet)))
+			g.GET(path.Join(uriAdmin, "/subscribers/import"), a.adminPage(pm(a.ViewImport, auth.PermSubscribersImport)))
+			g.GET(path.Join(uriAdmin, "/subscribers/bounces"), a.adminPage(pm(a.ViewBounces, auth.PermBouncesGet)))
+			g.GET(path.Join(uriAdmin, "/subscribers"), a.adminPage(pm(a.ViewSubscribers, auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
+			g.POST(path.Join(uriAdmin, "/subscribers"), a.adminPage(pm(a.ViewSubscribers, auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
+			g.GET(path.Join(uriAdmin, "/subscribers/lists/:id"), a.adminPage(pm(hasID(a.owned(core.EntityList, a.ViewSubscribers)), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
+			g.POST(path.Join(uriAdmin, "/subscribers/lists/:id"), a.adminPage(pm(hasID(a.owned(core.EntityList, a.ViewSubscribers)), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
+			g.GET(path.Join(uriAdmin, "/subscribers/new"), a.adminPage(pm(a.ViewNewSubscriber, auth.PermSubscribersManage)))
+			g.GET(path.Join(uriAdmin, "/subscribers/:id/edit"), a.adminPage(pm(hasID(a.owned(core.EntitySubscriber, a.ViewSubscriber)), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
+			g.GET(path.Join(uriAdmin, "/subscribers/:id"), a.adminPage(pm(hasID(a.owned(core.EntitySubscriber, a.ViewSubscriberInfo)), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
+			g.GET(path.Join(uriAdmin, "/subscribers/:id/lists"), a.adminPage(pm(hasID(a.owned(core.EntitySubscriber, a.ViewSubscriber)), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
+			g.GET(path.Join(uriAdmin, "/subscribers/:id/bounces"), a.adminPage(pm(pm(hasID(a.owned(core.EntitySubscriber, a.ViewSubscriberBounces)), auth.PermBouncesGet), auth.PermSubscribersGetAll, auth.PermSubscribersGet)))
 
-		// Settings.
-		g.GET(path.Join(uriAdmin, "/settings"), a.adminPage(pm(a.ViewSettings, auth.PermSettingsGet)))
-		g.GET(path.Join(uriAdmin, "/settings/logs"), a.adminPage(pm(a.ViewLogs, auth.PermSettingsGet)))
-		g.GET(path.Join(uriAdmin, "/settings/maintenance"), a.adminPage(pm(a.ViewMaintenance, auth.PermSettingsMaintain)))
+			// Users and roles. Static segments are registered before the :id param routes.
+			g.GET(path.Join(uriAdmin, "/users"), a.adminPage(pm(a.ViewUsers, auth.PermUsersGet)))
+			g.GET(path.Join(uriAdmin, "/users/new"), a.adminPage(pm(a.ViewUser, auth.PermUsersManage)))
+			g.GET(path.Join(uriAdmin, "/users/roles"), a.adminPage(pm(a.ViewUserRoles, auth.PermRolesGet)))
+			g.GET(path.Join(uriAdmin, "/users/roles/new"), a.adminPage(pm(a.ViewUserRole, auth.PermRolesManage)))
+			g.GET(path.Join(uriAdmin, "/users/roles/lists"), a.adminPage(pm(a.ViewListRoles, auth.PermRolesGet)))
+			g.GET(path.Join(uriAdmin, "/users/roles/lists/new"), a.adminPage(pm(a.ViewListRole, auth.PermRolesManage)))
+			g.GET(path.Join(uriAdmin, "/users/roles/lists/:id"), a.adminPage(pm(hasID(a.ViewListRole), auth.PermRolesGet)))
+			g.GET(path.Join(uriAdmin, "/users/roles/:id"), a.adminPage(pm(hasID(a.ViewUserRole), auth.PermRolesGet)))
+			g.GET(path.Join(uriAdmin, "/users/:id"), a.adminPage(pm(hasID(a.ViewUser), auth.PermUsersGet)))
+			g.GET(path.Join(uriAdmin, "/user/profile"), a.adminPage(a.ViewProfile))
+
+			// Settings.
+			g.GET(path.Join(uriAdmin, "/settings"), a.adminPage(pm(a.ViewSettings, auth.PermSettingsGet)))
+			g.GET(path.Join(uriAdmin, "/settings/logs"), a.adminPage(pm(a.ViewLogs, auth.PermSettingsGet)))
+			g.GET(path.Join(uriAdmin, "/settings/maintenance"), a.adminPage(pm(a.ViewMaintenance, auth.PermSettingsMaintain)))
+		}
 	}
 
 	// =================================================================
@@ -300,7 +307,15 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 
 		// Landing page.
 		g.GET("/", func(c *echo.Context) error {
-			return c.Render(http.StatusOK, "home", publicTpl{Title: "listmonk"})
+			if legacyAdmin() {
+				return c.Render(http.StatusOK, "home", publicTpl{Title: "listmonk"})
+			}
+			// A project's own address opens its subscription form; the
+			// main address opens Relais (or its login page).
+			if _, ok := a.hostProject(c); ok && a.cfg.EnablePublicSubPage {
+				return c.Redirect(http.StatusFound, "/subscription/form")
+			}
+			return c.Redirect(http.StatusFound, uriApp)
 		})
 
 		// Public admin endpoints (login page, OIDC endpoints, password reset).
