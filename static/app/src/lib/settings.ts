@@ -63,7 +63,12 @@ export function settingsForSave(settings: Settings): { settings: Settings } | { 
 export function forEditing(settings: Settings): Settings {
   const out = structuredClone(settings) as Settings & Obj;
   out.smtp = out.smtp.map((s) => ({ ...s, password: '' }));
-  if (isMasked(out['upload.s3.aws_secret_access_key'])) out['upload.s3.aws_secret_access_key'] = '';
+  for (const [path, k] of SECRETS) {
+    const v = out[path];
+    const items = Array.isArray(v) ? v as Obj[] : v && typeof v === 'object' ? [v as Obj] : [];
+    for (const item of items) if (k in item && isMasked(item[k])) item[k] = '';
+  }
+  for (const [k] of TOP_SECRETS) if (isMasked(out[k])) out[k] = '';
   const captcha = out['security.captcha'] as { hcaptcha?: Obj } | undefined;
   if (captcha?.hcaptcha && isMasked(captcha.hcaptcha.secret)) captcha.hcaptcha.secret = '';
   return out;

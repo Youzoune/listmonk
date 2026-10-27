@@ -63,6 +63,7 @@ describe('forEditing', () => {
     expect(e.smtp[0].password).toBe('');
     expect(e['upload.s3.aws_secret_access_key']).toBe('');
     expect((e['security.captcha'] as { hcaptcha: { secret: string } }).hcaptcha.secret).toBe('');
+    expect((e['bounce.mailboxes'] as { password: string }[])[0].password).toBe('');
     expect(base.smtp[0].password).toBe('••••••');
   });
 });

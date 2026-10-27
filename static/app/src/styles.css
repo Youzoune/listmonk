@@ -518,8 +518,8 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 .field select:disabled, .field input:disabled { opacity: .7; }
 .field-num .input-unit { min-height: 44px; }
 .boot { padding: 48px 24px; color: var(--muted); text-align: center; }
-.self-start { align-self: flex-start; }
-.oidc-rule { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)) auto; gap: 10px; align-items: end; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-sm); }
+.self-start { align-self: flex-start; justify-self: start; }
+.oidc-rule { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 10px; align-items: end; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-sm); }
 .panel.nested { background: var(--bg); padding: 16px; gap: 12px; }
 
 /* Formatting toolbar of the campaign text */
@@ -531,3 +531,5 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 .media-pick:hover, .media-pick:focus-visible { border-color: var(--fg); }
 .media-pick img { width: 100%; height: 100%; object-fit: cover; }
 .sql-search { gap: 8px; }
+.oidc-rule > .btn { justify-self: end; grid-column: -2; }
+.table select { border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); padding: 6px 10px; min-height: 36px; min-width: 220px; font: inherit; color: inherit; }
