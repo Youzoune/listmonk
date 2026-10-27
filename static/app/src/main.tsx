@@ -14,6 +14,9 @@ import { Brand } from './views/Brand';
 import { Campaigns } from './views/Campaigns';
 import { Guide } from './views/Guide';
 import { Home } from './views/Home';
+import { Import } from './views/Import';
+import { Lists } from './views/Lists';
+import { SubscriberEdit } from './views/SubscriberEdit';
 import { NewCampaign } from './views/NewCampaign';
 import { ProjectEdit } from './views/ProjectEdit';
 import { Projects } from './views/Projects';
@@ -50,6 +53,10 @@ const router = createBrowserRouter(
         { path: 'campagnes', element: <Campaigns /> },
         { path: 'campagnes/nouvelle', element: <NewCampaign /> },
         { path: 'audience', element: <Audience /> },
+        { path: 'audience/nouveau', element: <SubscriberEdit /> },
+        { path: 'audience/import', element: <Import /> },
+        { path: 'audience/:id', element: <SubscriberEdit /> },
+        { path: 'listes', element: <Lists /> },
         { path: 'relais', element: <Relays /> },
         { path: 'projets', element: <Projects /> },
         { path: 'projets/nouveau', element: <ProjectEdit /> },

@@ -263,3 +263,36 @@ export interface TemplateInput {
   subject: string;
   body: string;
 }
+
+export interface ListInput {
+  name: string;
+  type: 'public' | 'private';
+  optin: 'single' | 'double';
+  status: 'active' | 'archived';
+  tags: string[];
+  description: string;
+}
+
+export interface SubscriberInput {
+  email: string;
+  name: string;
+  status: 'enabled' | 'disabled' | 'blocklisted';
+  lists: number[];
+  attribs: Record<string, unknown>;
+  preconfirm_subscriptions: boolean;
+}
+
+export interface ImportStatus {
+  name: string;
+  total: number;
+  imported: number;
+  status: 'none' | 'importing' | 'stopping' | 'finished' | 'failed';
+}
+
+export interface ImportParams {
+  mode: 'subscribe' | 'blocklist';
+  subscription_status: 'unconfirmed' | 'confirmed';
+  overwrite: boolean;
+  delim: string;
+  lists: number[];
+}

@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, query } from './client';
+import { ApiError, api, query } from './client';
 import type {
   Campaign, CampaignStatus, DashboardCharts, DashboardCounts, List, NewCampaign, Page, Profile, Project,
-  ProjectInput, Relay, RelayInput, ServerConfig, Settings, SmtpServer, Subscriber, Template, TemplateInput, User,
+  ImportParams, ImportStatus, ListInput, ProjectInput, Relay, RelayInput, ServerConfig, Settings, SmtpServer, Subscriber, SubscriberInput, Template, TemplateInput, User,
 } from './types';
 
 // Query keys start with the project so that switching project refetches everything.
@@ -209,3 +209,79 @@ export function useTemplateAction(project: number | null) {
     onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
   });
 }
+
+export function useSaveList(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, list }: { id?: number; list: ListInput }) =>
+      id ? api<List>(`/api/lists/${id}`, { method: 'PUT', json: list }) : api<List>('/api/lists', { method: 'POST', json: list }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
+}
+
+export function useDeleteList(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api<boolean>(`/api/lists/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
+}
+
+export function useSubscriber(project: number | null, id: number | null) {
+  return useQuery({ queryKey: key(project, 'subscriber', id), queryFn: () => api<Subscriber>(`/api/subscribers/${id}`), enabled: !!id });
+}
+
+export function useSaveSubscriber(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, sub }: { id?: number; sub: SubscriberInput }) =>
+      id ? api<Subscriber>(`/api/subscribers/${id}`, { method: 'PUT', json: sub }) : api<Subscriber>('/api/subscribers', { method: 'POST', json: sub }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
+}
+
+export function useDeleteSubscriber(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api<boolean>(`/api/subscribers/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
+}
+
+// The importer is one per instance: its status is polled while it runs.
+export function useImportStatus(enabled: boolean) {
+  return useQuery({
+    queryKey: ['import-status'],
+    queryFn: () => api<ImportStatus>('/api/import/subscribers'),
+    enabled,
+    refetchInterval: (q) => (q.state.data?.status === 'importing' || q.state.data?.status === 'stopping' ? 1000 : false),
+  });
+}
+
+export function useImportLogs(enabled: boolean) {
+  return useQuery({ queryKey: ['import-logs'], queryFn: () => api<string>('/api/import/subscribers/logs'), enabled, refetchInterval: enabled ? 2000 : false });
+}
+
+export function useStartImport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ file, params }: { file: File; params: ImportParams }) => {
+      const form = new FormData();
+      form.set('params', JSON.stringify(params));
+      form.set('file', file);
+      // FormData needs the browser to set the multipart boundary itself.
+      return api<ImportStatus>('/api/import/subscribers', { method: 'POST', body: form });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['import-status'] }),
+  });
+}
+
+export function useStopImport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<ImportStatus>('/api/import/subscribers', { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export const isNotFound = (e: unknown) => e instanceof ApiError && (e.status === 404 || e.status === 400);

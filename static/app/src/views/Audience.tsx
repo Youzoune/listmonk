@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { useLists, useSubscribers } from '../api/hooks';
 import type { Subscriber } from '../api/types';
 import { Chip, ErrorState, Icon, Loading, Pager } from '../components/ui';
@@ -62,7 +62,11 @@ export function Audience() {
           <p className="eyebrow">{project.name}</p>
           <h1>Audience</h1>
         </div>
-        {can('subscribers:import') && <a className="btn" href="/admin/subscribers/import">Importer un fichier</a>}
+        <div className="row-gap">
+          <Link className="btn" to="/listes">Gérer les listes</Link>
+          {can('subscribers:import') && <Link className="btn" to="/audience/import">Importer un fichier</Link>}
+          {can('subscribers:manage') && <Link className="btn btn-primary" to="/audience/nouveau"><Icon name="plus" /> Nouveau contact</Link>}
+        </div>
       </header>
 
       {lists.isError ? <ErrorState error={lists.error} /> : (
@@ -112,7 +116,7 @@ export function Audience() {
                 {subs.data.results.map((s) => (
                   <tr key={s.id}>
                     <td>
-                      <a className="strong plain-link" href={`/admin/subscribers/${s.id}`}>{s.name}</a>
+                      <Link className="strong plain-link" to={`/audience/${s.id}`}>{s.name}</Link>
                       <span className="sub mono">{s.email}</span>
                     </td>
                     <td>
