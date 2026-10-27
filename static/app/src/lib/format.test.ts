@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { initials, percent, relayLabel, senderName } from './format';
+import { count, initials, percent, relayLabel, senderName } from './format';
 
 describe('format', () => {
   it('extracts the display name of a sender', () => {
@@ -16,6 +16,12 @@ describe('format', () => {
   it('names relays the way people read them', () => {
     expect(relayLabel('email')).toBe('Relais par défaut');
     expect(relayLabel('sport-ses')).toBe('sport-ses');
+  });
+
+  it('agrees counts in French', () => {
+    expect(count(0, 'brouillon')).toBe('0 brouillon');
+    expect(count(1, 'publique')).toBe('1 publique');
+    expect(count(1200, 'contact')).toBe(`${new Intl.NumberFormat('fr-FR').format(1200)} contacts`);
   });
 
   it('builds initials from names', () => {

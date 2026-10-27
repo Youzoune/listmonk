@@ -226,7 +226,7 @@ a.btn-dark { color: var(--bg); }
 .table tr:last-child td { border-bottom: 0; }
 .table tbody tr:hover td { background: var(--surface-2); }
 .table .right { text-align: right; }
-.cell-progress { min-width: 200px; display: grid; gap: 6px; }
+.cell-progress { min-width: 140px; display: grid; gap: 6px; }
 .empty { text-align: center; color: var(--muted); padding: 32px; }
 
 /* Wizard */
@@ -377,3 +377,6 @@ button.list-card:hover { border-color: var(--muted); }
 .relay-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 20px; }
 .facts-row { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .side-foot a .icon { flex: none; }
+.table td:first-child { min-width: 220px; }
+.table td:nth-child(3) { min-width: 150px; }
+.table th, .table td { padding-inline: 14px; }

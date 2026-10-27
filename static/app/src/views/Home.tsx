@@ -2,7 +2,7 @@ import { Link } from 'react-router';
 import { useCampaigns, useDashboard } from '../api/hooks';
 import type { Campaign } from '../api/types';
 import { CampaignChip, ErrorState, Icon, Loading, Progress, Sparkline } from '../components/ui';
-import { dateTime, num, percent, relayLabel } from '../lib/format';
+import { count, dateTime, num, percent, relayLabel } from '../lib/format';
 import { useProject } from '../project';
 
 const BOUNCE_ALERT = 0.03;
@@ -72,9 +72,9 @@ export function Home() {
           <div><dt>Contacts</dt><dd className="num">{counts.data ? num(counts.data.subscribers.total) : '…'}</dd>
             <span className="sub">{counts.data ? `${num(counts.data.subscribers.blocklisted)} en liste noire` : ''}</span></div>
           <div><dt>Listes</dt><dd className="num">{counts.data ? num(counts.data.lists.total) : '…'}</dd>
-            <span className="sub">{counts.data ? `${counts.data.lists.public} publiques, ${counts.data.lists.private} privées` : ''}</span></div>
+            <span className="sub">{counts.data ? `${count(counts.data.lists.public, 'publique')}, ${count(counts.data.lists.private, 'privée')}` : ''}</span></div>
           <div><dt>Campagnes</dt><dd className="num">{counts.data ? num(counts.data.campaigns.total) : '…'}</dd>
-            <span className="sub">{counts.data ? `${counts.data.campaigns.by_status.draft ?? 0} brouillons` : ''}</span></div>
+            <span className="sub">{counts.data ? count(counts.data.campaigns.by_status.draft ?? 0, 'brouillon') : ''}</span></div>
           <div><dt>E-mails envoyés</dt><dd className="num">{counts.data ? num(counts.data.messages) : '…'}</dd>
             <span className="sub">depuis le début</span></div>
         </dl>

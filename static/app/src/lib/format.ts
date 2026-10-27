@@ -31,3 +31,8 @@ export function relayLabel(messenger: string) {
 export function initials(name: string) {
   return name.split(/[\s—-]+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('');
 }
+
+// "1 brouillon", "3 brouillons". `plural` defaults to the singular plus "s".
+export function count(n: number, singular: string, plural = `${singular}s`) {
+  return `${num(n)} ${n > 1 ? plural : singular}`;
+}

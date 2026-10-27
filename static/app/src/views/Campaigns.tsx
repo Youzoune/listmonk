@@ -112,12 +112,12 @@ export function Campaigns() {
                       {c.lists.length ? c.lists.map((l) => <span key={l.id} className="block">{l.name}</span>) : <span className="muted">Aucune liste</span>}
                     </td>
                     <td><span className="mono-chip">{relayLabel(c.messenger)}</span></td>
-                    <td className="cell-progress">
+                    <td>
                       {c.status === 'draft' || c.status === 'scheduled' ? <span className="sub">Créée le {date(c.created_at)}</span> : (
-                        <>
+                        <div className="cell-progress">
                           <Progress value={c.sent} max={c.to_send} tone={c.status === 'paused' ? 'warn' : c.status === 'finished' ? 'ok' : 'run'} label={`${c.sent} sur ${c.to_send}`} />
                           <span className="sub num">{num(c.sent)} / {num(c.to_send)}</span>
-                        </>
+                        </div>
                       )}
                     </td>
                     <td className="right num">{percent(c.views, c.sent)}</td>
