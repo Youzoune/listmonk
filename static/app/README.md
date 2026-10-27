@@ -36,10 +36,20 @@ cd tests && bun playwright test specs/app.spec.js   # parcours e2e sur /app
 
 ## Où on en est
 
-* Faits : Aujourd'hui, Campagnes (filtres, recherche, pagination), Nouvelle campagne (assistant en 4 étapes, lancement ou planification),
-  Audience (listes, filtres, recherche), Relais d'envoi, Projets, Identité.
-* La connexion passe encore par la page de l'ancienne admin (`/admin/login`), qui gère déjà la double authentification et OIDC.
-* L'édition détaillée d'une campagne, d'un contact et les réglages ouvrent encore l'ancienne admin.
-* L'en-tête de projet est envoyé, mais l'API ne filtre pas encore par projet : c'est le lot 2.
-* Relais d'envoi (lot 4) : projet, cadence, plage d'envoi, warm-up et relais système réglables ; estimation de fin
-  dans l'assistant de campagne ; usage du jour sur l'accueil.
+| Écran | Adresse |
+|---|---|
+| Aujourd'hui, Campagnes, Nouvelle campagne | `/`, `/campagnes`, `/campagnes/nouvelle` |
+| Fiche campagne : contenu, aperçu, test, lancement, pause, programmation, duplication, statistiques | `/campagnes/:id` |
+| Audience, fiche contact, import CSV, listes, rebonds, formulaire d'inscription | `/audience`, `/audience/:id`, `/audience/import`, `/listes`, `/rebonds`, `/formulaire` |
+| Modèles (code HTML et aperçu en direct), médias | `/modeles`, `/medias` |
+| Relais d'envoi, Projets, Guide de l'envoi, Identité | `/relais`, `/projets`, `/guide`, `/marque` |
+| Équipe : utilisateurs et rôles | `/equipe` |
+| Réglages : général, SMTP (préréglages OVH, Google, Microsoft, Brevo…), vitesse, confidentialité, sécurité, rebonds, médias | `/reglages` |
+| Maintenance : nettoyage, journal du serveur | `/maintenance` |
+
+* Après connexion on arrive sur `/app`. La page de connexion reste celle du serveur (`/admin/login`) : elle gère déjà
+  la double authentification et OIDC.
+* Les mots de passe enregistrés ne repartent jamais vers le navigateur : un champ vide garde le mot de passe existant.
+* Encore seulement dans l'ancienne interface (`/admin`) : la configuration OIDC, les boîtes de rebond (POP/IMAP) et
+  les webhooks des fournisseurs, les messagers externes (postback), les permissions par liste dans les rôles, les
+  modèles visuels et l'éditeur riche, la recherche SQL avancée et l'export des contacts.
