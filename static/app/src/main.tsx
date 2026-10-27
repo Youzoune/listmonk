@@ -26,6 +26,7 @@ import { ProjectEdit } from './views/ProjectEdit';
 import { Projects } from './views/Projects';
 import { Relays } from './views/Relays';
 import { Settings } from './views/Settings';
+import { SignupForm } from './views/SignupForm';
 import { TemplateEdit, Templates } from './views/Templates';
 
 const queryClient = new QueryClient({
@@ -62,6 +63,7 @@ const router = createBrowserRouter(
         { path: 'audience/import', element: <Import /> },
         { path: 'audience/:id', element: <SubscriberEdit /> },
         { path: 'listes', element: <Lists /> },
+        { path: 'formulaire', element: <SignupForm /> },
         { path: 'rebonds', element: <Bounces /> },
         { path: 'medias', element: <MediaLibrary /> },
         { path: 'equipe', element: <Users /> },

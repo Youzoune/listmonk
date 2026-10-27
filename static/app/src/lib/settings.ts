@@ -57,3 +57,14 @@ export function settingsForSave(settings: Settings): { settings: Settings } | { 
 
   return { settings: out };
 }
+
+// The settings as the screens edit them: the secrets they show as password
+// fields start empty ("leave empty to keep") instead of masked.
+export function forEditing(settings: Settings): Settings {
+  const out = structuredClone(settings) as Settings & Obj;
+  out.smtp = out.smtp.map((s) => ({ ...s, password: '' }));
+  if (isMasked(out['upload.s3.aws_secret_access_key'])) out['upload.s3.aws_secret_access_key'] = '';
+  const captcha = out['security.captcha'] as { hcaptcha?: Obj } | undefined;
+  if (captcha?.hcaptcha && isMasked(captcha.hcaptcha.secret)) captcha.hcaptcha.secret = '';
+  return out;
+}

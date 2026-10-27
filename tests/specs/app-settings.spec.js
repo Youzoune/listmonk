@@ -74,4 +74,29 @@ test.describe('Relais settings', () => {
     expect(s['app.concurrency']).toBe(4);
     expect(s['privacy.unsubscribe_header']).toBe(!was);
   });
+
+  test('sets trusted URLs, bounce rules and uses them in the signup form', async ({ page }) => {
+    await page.goto('/app/reglages?onglet=securite');
+    await page.getByLabel('Adresses de confiance').fill('https://club.fr/merci');
+    await page.getByLabel('Altcha (sans service externe, recommandé)').check();
+    await page.getByRole('tab', { name: 'Rebonds' }).click();
+    await page.getByLabel('Rebond temporaire : après').fill('3');
+    await page.locator('#b-soft-action').selectOption('unsubscribe');
+    await page.getByRole('button', { name: 'Enregistrer' }).click();
+    await expect(page.locator('.save-bar')).toContainText('Enregistré', { timeout: 20000 });
+
+    const s = (await (await page.request.get('/api/settings')).json()).data;
+    expect(s['security.trusted_urls']).toEqual(['https://club.fr/merci']);
+    expect(s['security.captcha'].altcha.enabled).toBe(true);
+    expect(s['bounce.actions'].soft).toEqual({ count: 3, action: 'unsubscribe' });
+
+    await page.request.post('/api/lists', { data: { name: 'Lettre publique', type: 'public', optin: 'single' } });
+    await page.goto('/app/formulaire');
+    await page.getByLabel('Page après l’inscription (facultatif)').fill('https://club.fr/merci');
+    const code = page.getByLabel('Code HTML du formulaire');
+    await expect(code).toHaveValue(/action="http:\/\/localhost:\d+\/subscription\/form"/);
+    await expect(code).toHaveValue(/Lettre publique/);
+    await expect(code).toHaveValue(/name="next" value="https:\/\/club.fr\/merci"/);
+    await expect(code).toHaveValue(/altcha-widget/);
+  });
 });

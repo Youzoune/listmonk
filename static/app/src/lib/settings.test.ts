@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Settings } from '../api/types';
-import { isMasked, settingsForSave } from './settings';
+import { forEditing, isMasked, settingsForSave } from './settings';
 import { SMTP_PRESETS, applySmtpPreset, forSave, newSmtpServer, smtpErrors } from './smtp';
 
 const base = {
@@ -54,5 +54,15 @@ describe('SMTP servers', () => {
   it('only sends a password that was typed', () => {
     expect('password' in forSave({ ...newSmtpServer(), password: '' })).toBe(false);
     expect(forSave({ ...newSmtpServer(), password: 'abc' }).password).toBe('abc');
+  });
+});
+
+describe('forEditing', () => {
+  it('shows saved secrets as empty fields', () => {
+    const e = forEditing(base);
+    expect(e.smtp[0].password).toBe('');
+    expect(e['upload.s3.aws_secret_access_key']).toBe('');
+    expect((e['security.captcha'] as { hcaptcha: { secret: string } }).hcaptcha.secret).toBe('');
+    expect(base.smtp[0].password).toBe('••••••');
   });
 });

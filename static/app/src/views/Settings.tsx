@@ -4,7 +4,7 @@ import { useSaveSettings, useServerConfig, useSettings, useTestSmtp } from '../a
 import type { Settings as SettingsData, SmtpServer } from '../api/types';
 import { Chip, ErrorState, Explain, Field, Icon, Loading } from '../components/ui';
 import { relayLabel } from '../lib/format';
-import { settingsForSave } from '../lib/settings';
+import { forEditing, settingsForSave } from '../lib/settings';
 import { SMTP_PRESETS, applySmtpPreset, newSmtpServer, smtpErrors } from '../lib/smtp';
 import { useProject } from '../project';
 
@@ -13,6 +13,9 @@ const TABS = [
   { id: 'smtp', label: 'Serveurs SMTP' },
   { id: 'envoi', label: 'Vitesse d’envoi' },
   { id: 'confidentialite', label: 'Confidentialité' },
+  { id: 'securite', label: 'Sécurité' },
+  { id: 'rebonds', label: 'Rebonds' },
+  { id: 'medias', label: 'Stockage des médias' },
 ] as const;
 type Tab = typeof TABS[number]['id'];
 
@@ -344,6 +347,123 @@ function Privacy({ s, set, canEdit }: { s: SettingsData; set: Patch; canEdit: bo
   );
 }
 
+function Security({ s, set, canEdit }: { s: SettingsData; set: Patch; canEdit: boolean }) {
+  const captcha = s['security.captcha'] ?? { altcha: { enabled: false, complexity: 300000 }, hcaptcha: { enabled: false, key: '', secret: '' } };
+  const setCaptcha = (patch: Partial<typeof captcha>) => set({ 'security.captcha': { ...captcha, ...patch } });
+  return (
+    <section className="panel settings-panel">
+      <h2>Sécurité</h2>
+      <Field id="trusted-urls" label="Adresses de confiance" hint="Une par ligne. Pages vers lesquelles un formulaire d’inscription peut rediriger après l’inscription (par exemple https://monsite.fr/merci).">
+        <textarea id="trusted-urls" rows={3} className="mono" value={lines(s['security.trusted_urls'])} disabled={!canEdit}
+          onChange={(e) => set({ 'security.trusted_urls': fromLines(e.target.value) })} />
+      </Field>
+      <Field id="session" label="Durée de connexion" hint="Après ce délai sans activité, il faut se reconnecter. Par exemple 720h (30 jours).">
+        <input id="session" type="text" value={s['security.session_duration'] ?? ''} disabled={!canEdit} onChange={(e) => set({ 'security.session_duration': e.target.value })} />
+      </Field>
+      <h3>Protection anti-robots du formulaire public</h3>
+      <Toggle id="altcha" label="Altcha (sans service externe, recommandé)" checked={!!captcha.altcha?.enabled} disabled={!canEdit}
+        onChange={(v) => setCaptcha({ altcha: { ...captcha.altcha, enabled: v }, hcaptcha: { ...captcha.hcaptcha, enabled: v ? false : captcha.hcaptcha.enabled } })}
+        hint="Le navigateur résout un petit calcul invisible : les robots qui remplissent des formulaires à la chaîne sont arrêtés." />
+      <Toggle id="hcaptcha" label="hCaptcha" checked={!!captcha.hcaptcha?.enabled} disabled={!canEdit}
+        onChange={(v) => setCaptcha({ hcaptcha: { ...captcha.hcaptcha, enabled: v }, altcha: { ...captcha.altcha, enabled: v ? false : captcha.altcha.enabled } })}
+        hint="Le service hCaptcha, avec une clé de site et un secret." />
+      {captcha.hcaptcha?.enabled && (
+        <div className="grid-2">
+          <Field id="hc-key" label="Clé de site hCaptcha">
+            <input id="hc-key" type="text" value={captcha.hcaptcha.key} disabled={!canEdit} onChange={(e) => setCaptcha({ hcaptcha: { ...captcha.hcaptcha, key: e.target.value } })} />
+          </Field>
+          <Field id="hc-secret" label="Secret hCaptcha" hint="Laissez vide pour garder le secret enregistré.">
+            <input id="hc-secret" type="password" autoComplete="new-password" placeholder="Enregistré" value={captcha.hcaptcha.secret} disabled={!canEdit}
+              onChange={(e) => setCaptcha({ hcaptcha: { ...captcha.hcaptcha, secret: e.target.value } })} />
+          </Field>
+        </div>
+      )}
+      <p className="small muted">La connexion par un fournisseur d’identité (OIDC) se règle dans l’<a className="link" href="/admin/settings">ancienne interface</a>.</p>
+    </section>
+  );
+}
+
+const BOUNCE_TYPES = [
+  { id: 'hard', label: 'Rebond définitif', hint: 'L’adresse n’existe pas ou plus.' },
+  { id: 'soft', label: 'Rebond temporaire', hint: 'Boîte pleine, serveur indisponible.' },
+  { id: 'complaint', label: 'Plainte', hint: 'La personne a signalé l’e-mail comme spam.' },
+] as const;
+
+function BounceRules({ s, set, canEdit }: { s: SettingsData; set: Patch; canEdit: boolean }) {
+  const actions = s['bounce.actions'] ?? { hard: { count: 1, action: 'blocklist' }, soft: { count: 2, action: 'none' }, complaint: { count: 1, action: 'blocklist' } };
+  return (
+    <section className="panel settings-panel">
+      <h2>Rebonds</h2>
+      <Toggle id="bounce-on" label="Traiter les rebonds" checked={!!s['bounce.enabled']} disabled={!canEdit} onChange={(v) => set({ 'bounce.enabled': v })}
+        hint="Relais compte les e-mails refusés et applique les règles ci-dessous." />
+      <Toggle id="bounce-webhooks" label="Recevoir les rebonds par webhook" checked={!!s['bounce.webhooks_enabled']} disabled={!canEdit}
+        onChange={(v) => set({ 'bounce.webhooks_enabled': v })}
+        hint="Pour les prestataires (Amazon SES, Brevo, Postmark…) qui signalent les rebonds. Leur configuration se fait dans l’ancienne interface." />
+      <h3>Que faire après plusieurs rebonds</h3>
+      {BOUNCE_TYPES.map((t) => (
+        <div key={t.id} className="grid-2 bounce-rule">
+          <Num id={`b-${t.id}-count`} label={`${t.label} : après`} unit="rebond(s)" min={1} value={actions[t.id]?.count ?? 1} disabled={!canEdit}
+            onChange={(v) => set({ 'bounce.actions': { ...actions, [t.id]: { ...actions[t.id], count: v } } })} hint={t.hint} />
+          <Field id={`b-${t.id}-action`} label="Action">
+            <select id={`b-${t.id}-action`} value={actions[t.id]?.action ?? 'none'} disabled={!canEdit}
+              onChange={(e) => set({ 'bounce.actions': { ...actions, [t.id]: { ...actions[t.id], action: e.target.value as 'none' } } })}>
+              <option value="none">Ne rien faire</option>
+              <option value="unsubscribe">Désinscrire de toutes les listes</option>
+              <option value="blocklist">Mettre en liste noire</option>
+              <option value="delete">Supprimer le contact</option>
+            </select>
+          </Field>
+        </div>
+      ))}
+      <p className="small muted">Les boîtes de réception qui collectent les rebonds (POP3) se règlent dans l’<a className="link" href="/admin/settings">ancienne interface</a>.</p>
+    </section>
+  );
+}
+
+function MediaStorage({ s, set, canEdit }: { s: SettingsData; set: Patch; canEdit: boolean }) {
+  const s3 = s['upload.provider'] === 's3';
+  const text = (k: keyof SettingsData, id: string, label: string, hint?: string, type = 'text') => (
+    <Field id={id} label={label} hint={hint}>
+      <input id={id} type={type} value={(s[k] as string) ?? ''} disabled={!canEdit} autoComplete={type === 'password' ? 'new-password' : undefined}
+        placeholder={type === 'password' ? 'Enregistré' : undefined} onChange={(e) => set({ [k]: e.target.value } as Partial<SettingsData>)} />
+    </Field>
+  );
+  return (
+    <section className="panel settings-panel">
+      <h2>Stockage des médias</h2>
+      <Field id="upload-provider" label="Où ranger les fichiers" hint="Sur Coolify, le dossier du serveur est un volume persistant (relais-uploads).">
+        <select id="upload-provider" value={s['upload.provider']} disabled={!canEdit} onChange={(e) => set({ 'upload.provider': e.target.value as 'filesystem' | 's3' })}>
+          <option value="filesystem">Sur le serveur</option>
+          <option value="s3">Stockage S3 (Amazon, Scaleway, Cloudflare R2…)</option>
+        </select>
+      </Field>
+      <Field id="upload-ext" label="Types de fichiers acceptés" hint="Séparés par des virgules, par exemple jpg, png, gif, pdf.">
+        <input id="upload-ext" type="text" value={(s['upload.extensions'] ?? []).join(', ')} disabled={!canEdit}
+          onChange={(e) => set({ 'upload.extensions': e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })} />
+      </Field>
+      {s3 ? (
+        <>
+          {text('upload.s3.url', 's3-url', 'Adresse du service S3', 'Par exemple https://s3.fr-par.scw.cloud')}
+          <div className="grid-2">
+            {text('upload.s3.bucket', 's3-bucket', 'Bucket')}
+            {text('upload.s3.aws_default_region', 's3-region', 'Région')}
+          </div>
+          <div className="grid-2">
+            {text('upload.s3.aws_access_key_id', 's3-key', 'Clé d’accès')}
+            {text('upload.s3.aws_secret_access_key', 's3-secret', 'Clé secrète', 'Laissez vide pour garder la clé enregistrée.', 'password')}
+          </div>
+          {text('upload.s3.public_url', 's3-public', 'Adresse publique des fichiers (facultatif)', 'Si les fichiers sont servis par un autre domaine (CDN).')}
+        </>
+      ) : (
+        <div className="grid-2">
+          {text('upload.filesystem.upload_path', 'fs-path', 'Dossier sur le serveur')}
+          {text('upload.filesystem.upload_uri', 'fs-uri', 'Adresse des fichiers', 'Le chemin web, par exemple /uploads.')}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function Settings() {
   const { can } = useProject();
   const canEdit = can('settings:manage');
@@ -356,15 +476,14 @@ export function Settings() {
 
   useEffect(() => {
     if (settings.data && !draft) {
-      // Saved passwords come back masked: edit them as empty fields.
-      setDraft({ ...settings.data, smtp: settings.data.smtp.map((x) => ({ ...x, password: '' })) });
+      // Saved secrets come back masked: edit them as empty fields.
+      setDraft(forEditing(settings.data));
     }
   }, [settings.data, draft]);
 
   const dirty = useMemo(() => {
     if (!draft || !settings.data) return false;
-    const base = { ...settings.data, smtp: settings.data.smtp.map((x) => ({ ...x, password: '' })) };
-    return JSON.stringify(base) !== JSON.stringify(draft);
+    return JSON.stringify(forEditing(settings.data)) !== JSON.stringify(draft);
   }, [draft, settings.data]);
 
   const set: Patch = (patch) => {
@@ -416,6 +535,9 @@ export function Settings() {
           {tab === 'smtp' && <Smtp s={draft} set={set} canEdit={canEdit} />}
           {tab === 'envoi' && <Sending s={draft} set={set} canEdit={canEdit} />}
           {tab === 'confidentialite' && <Privacy s={draft} set={set} canEdit={canEdit} />}
+          {tab === 'securite' && <Security s={draft} set={set} canEdit={canEdit} />}
+          {tab === 'rebonds' && <BounceRules s={draft} set={set} canEdit={canEdit} />}
+          {tab === 'medias' && <MediaStorage s={draft} set={set} canEdit={canEdit} />}
         </>
       )}
 

@@ -85,7 +85,10 @@ export function Lists() {
           <Link className="link back" to="/audience"><Icon name="back" size={15} /> Audience</Link>
           <h1>Listes</h1>
         </div>
-        {canEdit && <button type="button" className="btn btn-primary" onClick={() => setEditing('new')}><Icon name="plus" /> Nouvelle liste</button>}
+        <div className="row-gap">
+          <Link className="btn" to="/formulaire">Formulaire d’inscription</Link>
+          {canEdit && <button type="button" className="btn btn-primary" onClick={() => setEditing('new')}><Icon name="plus" /> Nouvelle liste</button>}
+        </div>
       </header>
 
       <Explain title="Listes publiques, privées, simple ou double confirmation">

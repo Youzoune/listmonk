@@ -35,6 +35,7 @@ export interface ServerConfig {
   root_url_locked?: boolean;
   // permissions.json: [{ group, permissions }].
   permissions?: unknown;
+  public_subscription?: { enabled: boolean; captcha_enabled: boolean; captcha_provider: string | null; captcha_key: string | null };
   // Base domain of the projects' subdomains, "" if none.
   projects_domain?: string;
   from_email: string;
@@ -169,6 +170,24 @@ export interface Settings {
   'privacy.allow_export': boolean;
   'privacy.allow_wipe': boolean;
   'privacy.record_optin_ip': boolean;
+  'security.captcha': { altcha: { enabled: boolean; complexity: number }; hcaptcha: { enabled: boolean; key: string; secret: string } };
+  'security.session_duration': string;
+  'security.trusted_urls': string[];
+  'upload.provider': 'filesystem' | 's3';
+  'upload.extensions': string[];
+  'upload.filesystem.upload_path': string;
+  'upload.filesystem.upload_uri': string;
+  'upload.s3.url': string;
+  'upload.s3.public_url': string;
+  'upload.s3.aws_access_key_id': string;
+  'upload.s3.aws_secret_access_key': string;
+  'upload.s3.aws_default_region': string;
+  'upload.s3.bucket': string;
+  'upload.s3.bucket_path': string;
+  'upload.s3.bucket_type': string;
+  'bounce.enabled': boolean;
+  'bounce.webhooks_enabled': boolean;
+  'bounce.actions': Record<'soft' | 'hard' | 'complaint', { count: number; action: 'none' | 'unsubscribe' | 'blocklist' | 'delete' }>;
   [key: string]: unknown;
 }
 
