@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SLUG_MAX, hasAllProjects, isValidDomain, isValidSlug, slugify, toggleId } from './projects';
+import { SLUG_MAX, hasAllProjects, isValidDomain, isValidSlug, slugify, toggleId, publicURLs, rootHost } from './projects';
 
 describe('slugify', () => {
   it('builds a slug the server accepts from any name', () => {
@@ -50,5 +50,27 @@ describe('access', () => {
     expect(toggleId([1, 3], 2, true)).toEqual([1, 2, 3]);
     expect(toggleId([1, 2], 2, true)).toEqual([1, 2]);
     expect(toggleId([1, 2], 2, false)).toEqual([1]);
+  });
+});
+
+describe('publicURLs', () => {
+  it('uses the project domain, with the instance scheme and path', () => {
+    const u = publicURLs({ id: 2, slug: 'sport', domain: 'News.Sport.fr' }, 'http://example.org/listmonk/');
+    expect(u).toEqual({
+      root: 'http://news.sport.fr/listmonk',
+      form: 'http://news.sport.fr/listmonk/subscription/form',
+      archive: 'http://news.sport.fr/listmonk/archive',
+      feed: 'http://news.sport.fr/listmonk/archive.xml',
+      ownDomain: true,
+    });
+  });
+
+  it('falls back to the instance address with the project slug', () => {
+    expect(publicURLs({ id: 3, slug: 'culture', domain: null }, 'https://lists.example.org').archive)
+      .toBe('https://lists.example.org/archive?project=culture');
+    expect(publicURLs({ id: 1, slug: 'default', domain: null }, 'https://lists.example.org').form)
+      .toBe('https://lists.example.org/subscription/form');
+    expect(rootHost('https://lists.example.org/x')).toBe('lists.example.org');
+    expect(publicURLs({ id: 2, slug: 'sport', domain: 'sport.localhost' }, 'http://localhost:9000').root).toBe('http://sport.localhost:9000');
   });
 });

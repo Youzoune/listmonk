@@ -40,3 +40,39 @@ export function toggleId(ids: number[], id: number, on: boolean): number[] {
   const rest = ids.filter((x) => x !== id);
   return on ? [...rest, id].sort((a, b) => a - b) : rest;
 }
+
+export interface PublicURLs {
+  root: string;
+  form: string;
+  archive: string;
+  feed: string;
+  // The project has its own domain.
+  ownDomain: boolean;
+}
+
+// The public addresses of a project, as the server builds them
+// (internal/projectdir): its own domain (same scheme, port and path) if it has one, otherwise the
+// instance's address with ?project=<slug> (none for the default project).
+export function publicURLs(p: { id: number; slug: string; domain: string | null }, rootURL: string): PublicURLs {
+  const root = rootURL.replace(/\/+$/, '');
+  if (p.domain) {
+    let base = `https://${p.domain.toLowerCase()}`;
+    try {
+      const u = new URL(root);
+      base = `${u.protocol}//${p.domain.toLowerCase()}${u.port ? `:${u.port}` : ''}${u.pathname.replace(/\/+$/, '')}`;
+    } catch { /* keep https */ }
+    return { root: base, form: `${base}/subscription/form`, archive: `${base}/archive`, feed: `${base}/archive.xml`, ownDomain: true };
+  }
+
+  const q = p.id === 1 ? '' : `?project=${encodeURIComponent(p.slug)}`;
+  return { root, form: `${root}/subscription/form${q}`, archive: `${root}/archive${q}`, feed: `${root}/archive.xml${q}`, ownDomain: false };
+}
+
+// The host the project's domain should point to (CNAME target).
+export function rootHost(rootURL: string): string {
+  try {
+    return new URL(rootURL).hostname;
+  } catch {
+    return '';
+  }
+}

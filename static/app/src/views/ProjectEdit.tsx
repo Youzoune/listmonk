@@ -1,10 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
-import { useDeleteProject, useSaveProject, useSetUserProjects, useUsers, useUsersProjects } from '../api/hooks';
+import { useDeleteProject, useSaveProject, useServerConfig, useSetUserProjects, useUsers, useUsersProjects } from '../api/hooks';
 import type { Project, User } from '../api/types';
-import { Chip, ErrorState, Field, Icon, Loading, ProjectBadge } from '../components/ui';
+import { Chip, ErrorState, Explain, Field, Icon, Loading, ProjectBadge } from '../components/ui';
 import { count } from '../lib/format';
-import { hasAllProjects, isValidDomain, isValidSlug, slugify, toggleId } from '../lib/projects';
+import { hasAllProjects, isValidDomain, isValidSlug, publicURLs, rootHost, slugify, toggleId } from '../lib/projects';
 import { useProject } from '../project';
 
 const DEFAULT_PROJECT_ID = 1;
@@ -54,7 +54,7 @@ function ProjectForm({ project, onSaved }: { project?: Project; onSaved: (p: Pro
       </Field>
       {submitted && errors.slug && <p className="field-error">{errors.slug}</p>}
 
-      <Field id="p-domain" label="Domaine (facultatif)" hint="Le domaine des pages publiques du projet : inscription, préférences, désinscription.">
+      <Field id="p-domain" label="Domaine (facultatif)" hint="Le domaine des pages publiques du projet (inscription, préférences, désinscription, archive) et des liens de ses e-mails.">
         <input id="p-domain" type="text" className="mono" value={domain} onChange={(e) => setDomain(e.target.value)}
           placeholder="newsletter.exemple.fr" aria-invalid={submitted && !!errors.domain} />
       </Field>
@@ -74,6 +74,52 @@ function ProjectForm({ project, onSaved }: { project?: Project; onSaved: (p: Pro
         </button>
       </div>
     </form>
+  );
+}
+
+function PublicPages({ project }: { project: Project }) {
+  const { project: current } = useProject();
+  const config = useServerConfig(current.id);
+  if (!config.data) return null;
+
+  const urls = publicURLs(project, config.data.root_url);
+  const target = rootHost(config.data.root_url);
+  const links: [string, string][] = [
+    ['Formulaire d’inscription', urls.form],
+    ['Archive des campagnes', urls.archive],
+    ['Flux RSS de l’archive', urls.feed],
+  ];
+
+  return (
+    <section className="panel public-pages">
+      <h2>Pages publiques</h2>
+      <p className="small">
+        {urls.ownDomain
+          ? <>Les pages publiques de « {project.name} » sont servies sur <span className="mono strong">{project.domain}</span>, à son nom. Les liens de ses e-mails (désinscription, préférences, lecture en ligne, suivi des clics) pointent aussi vers ce domaine.</>
+          : <>Sans domaine, les pages publiques de « {project.name} » utilisent l’adresse principale de l’instance. Ajoutez un domaine dans les réglages pour qu’elles soient à son nom.</>}
+      </p>
+      <dl className="url-list">
+        {links.map(([label, url]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd><a className="link mono" href={url} target="_blank" rel="noreferrer">{url}</a></dd>
+          </div>
+        ))}
+      </dl>
+      <p className="small muted">
+        Un contact qui se désinscrit ne quitte que les listes de ce projet. Inscrit avec la même adresse dans un autre projet, il y reste.
+      </p>
+      {urls.ownDomain && (
+        <Explain title="Brancher le domaine, étape par étape">
+          <ol className="steps-list">
+            <li>Chez le gestionnaire du domaine (OVHcloud, Gandi, Cloudflare…), créez un enregistrement <span className="strong">CNAME</span> : <span className="mono">{project.domain}</span> → <span className="mono">{target || 'l’adresse du serveur Relais'}</span>.</li>
+            <li>Sur le serveur, ajoutez le domaine au proxy qui sert Relais (Caddy, Nginx, Traefik…) avec un certificat HTTPS, par exemple Let’s Encrypt.</li>
+            <li>Ouvrez le formulaire d’inscription ci-dessus : il doit s’afficher avec le nom du projet.</li>
+          </ol>
+          <p>Tant que le domaine n’est pas branché, les liens des e-mails de ce projet ne fonctionnent pas : branchez-le avant d’envoyer une campagne.</p>
+        </Explain>
+      )}
+    </section>
   );
 }
 
@@ -220,6 +266,7 @@ export function ProjectEdit() {
         <div className="grid-2 align-start">
           <ProjectForm key={project.id} project={project} onSaved={() => undefined} />
           <div className="stack">
+            <PublicPages project={project} />
             <Access project={project} />
             <DangerZone project={project} />
           </div>

@@ -123,6 +123,7 @@ func (a *App) CreateProject(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
+	a.refreshProjects()
 
 	return c.JSON(http.StatusOK, okResp{out})
 }
@@ -143,6 +144,7 @@ func (a *App) UpdateProject(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
+	a.refreshProjects()
 
 	return c.JSON(http.StatusOK, okResp{out})
 }
@@ -152,6 +154,7 @@ func (a *App) DeleteProject(c *echo.Context) error {
 	if err := a.core.DeleteProject(getID(c)); err != nil {
 		return err
 	}
+	a.refreshProjects()
 
 	return c.JSON(http.StatusOK, okResp{true})
 }

@@ -179,13 +179,9 @@ func (a *App) ViewCampaign(c *echo.Context) error {
 		return err
 	}
 
-	// Public archive URL has the slug if its set or the campaign UUID otherwise.
-	archiveURL := a.urlCfg.ArchiveURL
-	if camp.ArchiveSlug.Valid {
-		archiveURL, _ = url.JoinPath(a.urlCfg.ArchiveURL, camp.ArchiveSlug.String)
-	} else {
-		archiveURL, _ = url.JoinPath(a.urlCfg.ArchiveURL, camp.UUID)
-	}
+	// Public archive URL, on the domain of the campaign's project, with the
+	// slug if it's set or the campaign UUID otherwise.
+	archiveURL := a.projects.ArchiveCampaignURL(camp)
 
 	data := campaignView{
 		adminView:  newAdminView(c, camp.Name+" / "+a.i18n.T("globals.terms.campaigns"), "", "campaigns.all"),
