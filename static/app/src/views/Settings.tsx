@@ -520,7 +520,10 @@ export function Settings() {
           <p className="eyebrow">Instance</p>
           <h1>Réglages</h1>
         </div>
-        <a className="btn btn-ghost" href="/admin/settings"><Icon name="out" size={16} /> Tous les réglages (ancienne interface)</a>
+        <div className="row-gap">
+          <Link className="btn" to="/maintenance">Maintenance et journal</Link>
+          <a className="btn btn-ghost" href="/admin/settings"><Icon name="out" size={16} /> Ancienne interface</a>
+        </div>
       </header>
 
       <div className="segmented" role="tablist" aria-label="Rubriques des réglages">

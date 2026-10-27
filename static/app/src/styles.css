@@ -384,6 +384,12 @@ a.btn-dark { color: var(--bg); }
 .media-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .media-name { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+.maint-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.maint-job { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: flex-end; padding: 14px 0; border-top: 1px solid var(--line); }
+.maint-job > div:first-child { flex: 1 1 280px; min-width: 0; }
+.maint-job p { margin: 0; }
+.server-logs { max-height: 420px; overflow: auto; }
+
 /* Guide */
 .guide-layout { display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start; }
 .guide-toc { flex: 1 1 220px; display: grid; gap: 12px; position: sticky; top: 24px; }
