@@ -73,6 +73,10 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 		g.GET(path.Join(uriAdmin, "/custom.css"), serveCustomAppearance("admin.custom_css"))
 		g.GET(path.Join(uriAdmin, "/custom.js"), serveCustomAppearance("admin.custom_js"))
 		g.GET(uriAdmin, a.adminPage(a.ViewDashboard))
+
+		// React admin. Every path under it is a client-side route.
+		g.GET(uriApp, a.ServeApp)
+		g.GET(uriApp+"/*", a.ServeApp)
 		g.GET(path.Join(uriAdmin, "/lists"), a.adminPage(a.ViewLists))
 		g.GET(path.Join(uriAdmin, "/lists/analytics"), a.adminPage(a.ViewListAnalytics))
 		g.GET(path.Join(uriAdmin, "/lists/new"), a.adminPage(pm(a.ViewNewList, auth.PermListManageAll)))

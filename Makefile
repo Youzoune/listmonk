@@ -27,6 +27,18 @@ FRONTEND_DEPS = \
 	$(FRONTEND)/build.mjs \
 	$(shell find $(FRONTEND)/assets -type f)
 
+# React admin (Relais), built with Vite into static/app/dist and served at /app.
+APP = static/app
+APP_DIST = $(APP)/dist
+APP_DEPS_STAMP = $(APP)/node_modules/.installed
+APP_DEPS = \
+	$(APP_DEPS_STAMP) \
+	$(APP)/package.json \
+	$(APP)/bun.lock \
+	$(APP)/index.html \
+	$(APP)/vite.config.ts \
+	$(shell find $(APP)/src $(APP)/public -type f 2>/dev/null)
+
 BIN := listmonk
 STATIC := config.toml.sample \
 	schema.sql queries:/queries permissions.json \
@@ -35,6 +47,7 @@ STATIC := config.toml.sample \
 	static/admin/partials:/admin/partials \
 	static/admin/dist:/admin/static \
 	static/admin/i18n.txt:/admin/i18n.txt \
+	static/app/dist:/app \
 	static/email-templates \
 	i18n:/i18n
 
@@ -60,7 +73,7 @@ $(BIN): FORCE $(SRC) go.mod go.sum schema.sql $(SQL) permissions.json
 GO_RUN = CGO_ENABLED=0 go run -ldflags="-s -w -X 'main.buildString=${BUILDSTR}' -X 'main.versionString=${VERSION}'" ./cmd
 
 .PHONY: run
-run: $(FRONTEND_DIST)
+run: $(FRONTEND_DIST) $(APP_DIST)
 ifneq ($(DEV_CONFIG),)
 	$(GO_RUN) --config="$(DEV_CONFIG)" --install --idempotent --yes
 endif
@@ -86,6 +99,23 @@ $(FRONTEND_DIST): $(FRONTEND_ICONS) $(FRONTEND_DEPS)
 .PHONY: build-frontend
 build-frontend: $(FRONTEND_DIST)
 
+$(APP_DEPS_STAMP): $(APP)/package.json $(APP)/bun.lock
+	cd $(APP) && bun install --frozen-lockfile
+	touch $(APP_DEPS_STAMP)
+
+# Build the React admin into static/app/dist.
+$(APP_DIST): $(APP_DEPS)
+	cd $(APP) && bun run build
+	touch -c $(APP_DIST)
+
+.PHONY: build-app
+build-app: $(APP_DIST)
+
+# Run the React admin's unit tests.
+.PHONY: test-app
+test-app: $(APP_DEPS_STAMP)
+	cd $(APP) && bun run test
+
 # Run Go tests.
 .PHONY: test
 test:
@@ -94,13 +124,13 @@ test:
 # Bundle all static assets including the SSR admin frontend into the ./listmonk binary
 # using stuffbin.
 .PHONY: dist
-dist: $(STUFFBIN) build build-frontend
+dist: $(STUFFBIN) build build-frontend build-app
 	$(MAKE) pack-bin
 
 # pack-bin runs stuffbin packing on the given binary. This is used
 # in the .goreleaser post-build hook.
 .PHONY: pack-bin
-pack-bin: build-frontend $(STUFFBIN)
+pack-bin: build-frontend build-app $(STUFFBIN)
 	$(STUFFBIN) -a stuff -in ${BIN} -out ${BIN} ${STATIC}
 
 # Use goreleaser to do a dry run producing local builds.
