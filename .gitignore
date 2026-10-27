@@ -10,3 +10,6 @@ node_modules
 listmonk
 dist/*
 uploads/
+
+# Built mock-up page (bun ./build.mjs).
+docs/youzoune/maquette/relais.html

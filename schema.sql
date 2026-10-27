@@ -15,12 +15,29 @@ DROP TYPE IF EXISTS twofa_type CASCADE; CREATE TYPE twofa_type AS ENUM ('none', 
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- projects (workspaces). Lists, subscribers, campaigns, templates and media
+-- belong to exactly one project. Project 1 is the default project.
+DROP TABLE IF EXISTS projects CASCADE;
+CREATE TABLE projects (
+    id              SERIAL PRIMARY KEY,
+    uuid            uuid NOT NULL UNIQUE,
+    name            TEXT NOT NULL,
+    slug            TEXT NOT NULL UNIQUE,
+    domain          TEXT NULL UNIQUE,
+    description     TEXT NOT NULL DEFAULT '',
+
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+INSERT INTO projects (uuid, name, slug) VALUES (gen_random_uuid(), 'Default', 'default');
+
 -- subscribers
 DROP TABLE IF EXISTS subscribers CASCADE;
 CREATE TABLE subscribers (
     id              SERIAL PRIMARY KEY,
     uuid uuid       NOT NULL UNIQUE,
-    email           TEXT NOT NULL UNIQUE,
+    project_id      INTEGER NOT NULL DEFAULT 1 REFERENCES projects(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    email           TEXT NOT NULL,
     name            TEXT NOT NULL,
     attribs         JSONB NOT NULL DEFAULT '{}',
     status          subscriber_status NOT NULL DEFAULT 'enabled',
@@ -28,7 +45,9 @@ CREATE TABLE subscribers (
     created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-DROP INDEX IF EXISTS idx_subs_email; CREATE UNIQUE INDEX idx_subs_email ON subscribers(LOWER(email));
+-- An e-mail is unique within a project, and may exist in several projects.
+DROP INDEX IF EXISTS idx_subs_project_email; CREATE UNIQUE INDEX idx_subs_project_email ON subscribers(project_id, LOWER(email));
+DROP INDEX IF EXISTS idx_subs_project_id; CREATE INDEX idx_subs_project_id ON subscribers(project_id);
 DROP INDEX IF EXISTS idx_subs_status; CREATE INDEX idx_subs_status ON subscribers(status);
 DROP INDEX IF EXISTS idx_subs_id_status; CREATE INDEX idx_subs_id_status ON subscribers(id, status);
 DROP INDEX IF EXISTS idx_subs_created_at; CREATE INDEX idx_subs_created_at ON subscribers(created_at);
@@ -38,6 +57,7 @@ DROP INDEX IF EXISTS idx_subs_updated_at; CREATE INDEX idx_subs_updated_at ON su
 DROP TABLE IF EXISTS lists CASCADE;
 CREATE TABLE lists (
     id              SERIAL PRIMARY KEY,
+    project_id      INTEGER NOT NULL DEFAULT 1 REFERENCES projects(id) ON DELETE RESTRICT ON UPDATE CASCADE,
     uuid            uuid NOT NULL UNIQUE,
     name            TEXT NOT NULL,
     type            list_type NOT NULL,
@@ -55,6 +75,7 @@ DROP INDEX IF EXISTS idx_lists_status; CREATE INDEX idx_lists_status ON lists(st
 DROP INDEX IF EXISTS idx_lists_name; CREATE INDEX idx_lists_name ON lists(name);
 DROP INDEX IF EXISTS idx_lists_created_at; CREATE INDEX idx_lists_created_at ON lists(created_at);
 DROP INDEX IF EXISTS idx_lists_updated_at; CREATE INDEX idx_lists_updated_at ON lists(updated_at);
+DROP INDEX IF EXISTS idx_lists_project_id; CREATE INDEX idx_lists_project_id ON lists(project_id);
 
 
 DROP TABLE IF EXISTS subscriber_lists CASCADE;
@@ -79,6 +100,7 @@ CREATE INDEX IF NOT EXISTS idx_sub_lists_unsubscribed_updated_at ON subscriber_l
 DROP TABLE IF EXISTS templates CASCADE;
 CREATE TABLE templates (
     id              SERIAL PRIMARY KEY,
+    project_id      INTEGER NOT NULL DEFAULT 1 REFERENCES projects(id) ON DELETE RESTRICT ON UPDATE CASCADE,
     name            TEXT NOT NULL,
     type            template_type NOT NULL DEFAULT 'campaign',
     subject         TEXT NOT NULL,
@@ -90,12 +112,14 @@ CREATE TABLE templates (
     updated_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 CREATE UNIQUE INDEX ON templates (is_default) WHERE is_default = true;
+DROP INDEX IF EXISTS idx_tpl_project_id; CREATE INDEX idx_tpl_project_id ON templates(project_id);
 
 
 -- campaigns
 DROP TABLE IF EXISTS campaigns CASCADE;
 CREATE TABLE campaigns (
     id               SERIAL PRIMARY KEY,
+    project_id       INTEGER NOT NULL DEFAULT 1 REFERENCES projects(id) ON DELETE RESTRICT ON UPDATE CASCADE,
     uuid uuid        NOT NULL UNIQUE,
     name             TEXT NOT NULL,
     subject          TEXT NOT NULL,
@@ -138,6 +162,7 @@ DROP INDEX IF EXISTS idx_camps_status; CREATE INDEX idx_camps_status ON campaign
 DROP INDEX IF EXISTS idx_camps_name; CREATE INDEX idx_camps_name ON campaigns(name);
 DROP INDEX IF EXISTS idx_camps_created_at; CREATE INDEX idx_camps_created_at ON campaigns(created_at);
 DROP INDEX IF EXISTS idx_camps_updated_at; CREATE INDEX idx_camps_updated_at ON campaigns(updated_at);
+DROP INDEX IF EXISTS idx_camps_project_id; CREATE INDEX idx_camps_project_id ON campaigns(project_id);
 
 
 DROP TABLE IF EXISTS campaign_lists CASCADE;
@@ -171,6 +196,7 @@ DROP INDEX IF EXISTS idx_views_date; CREATE INDEX idx_views_date ON campaign_vie
 DROP TABLE IF EXISTS media CASCADE;
 CREATE TABLE media (
     id               SERIAL PRIMARY KEY,
+    project_id       INTEGER NOT NULL DEFAULT 1 REFERENCES projects(id) ON DELETE RESTRICT ON UPDATE CASCADE,
     uuid uuid        NOT NULL UNIQUE,
     provider         TEXT NOT NULL DEFAULT '',
     filename         TEXT NOT NULL,
@@ -180,6 +206,7 @@ CREATE TABLE media (
     created_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 DROP INDEX IF EXISTS idx_media_filename; CREATE INDEX idx_media_filename ON media(provider, filename);
+DROP INDEX IF EXISTS idx_media_project_id; CREATE INDEX idx_media_project_id ON media(project_id);
 
 -- campaign_media
 DROP TABLE IF EXISTS campaign_media CASCADE;
@@ -363,6 +390,18 @@ CREATE TABLE sessions (
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now() NOT NULL
 );
 DROP INDEX IF EXISTS idx_sessions; CREATE INDEX idx_sessions ON sessions (id, created_at);
+
+-- projects a user has access to. Users with the Super Admin role have
+-- access to all projects regardless of this table.
+DROP TABLE IF EXISTS user_projects CASCADE;
+CREATE TABLE user_projects (
+    user_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    project_id       INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    created_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+
+    PRIMARY KEY(user_id, project_id)
+);
+DROP INDEX IF EXISTS idx_user_projects_project_id; CREATE INDEX idx_user_projects_project_id ON user_projects(project_id);
 
 -- materialized views
 

@@ -257,6 +257,15 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 		g.PUT("/api/users/:id/twofa", hasID(a.EnableTOTP))
 		g.DELETE("/api/users/:id/twofa", hasID(a.DisableTOTP))
 
+		g.GET("/api/users/:id/projects", pm(hasID(a.GetUserProjects), auth.PermUsersGet))
+		g.PUT("/api/users/:id/projects", pm(hasID(a.UpdateUserProjects), auth.PermUsersManage))
+
+		g.GET("/api/projects", pm(a.GetProjects, auth.PermProjectsGet, auth.PermProjectsManage))
+		g.GET("/api/projects/:id", pm(hasID(a.GetProject), auth.PermProjectsGet, auth.PermProjectsManage))
+		g.POST("/api/projects", pm(a.CreateProject, auth.PermProjectsManage))
+		g.PUT("/api/projects/:id", pm(hasID(a.UpdateProject), auth.PermProjectsManage))
+		g.DELETE("/api/projects/:id", pm(hasID(a.DeleteProject), auth.PermProjectsManage))
+
 		g.GET("/api/roles/users", pm(a.GetUserRoles, auth.PermRolesGet))
 		g.GET("/api/roles/lists", pm(a.GeListRoles, auth.PermRolesGet))
 		g.POST("/api/roles/users", pm(a.CreateUserRole, auth.PermRolesManage))
