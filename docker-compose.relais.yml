@@ -46,7 +46,8 @@ services:
     labels:
       # Every project subdomain goes to Relais, which finds the project from
       # the host. Priority 1: the specific routes of other apps always win.
-      # The wildcard certificate needs Traefik's DNS challenge (README).
+      # The wildcard certificate needs a Traefik resolver using the DNS
+      # challenge: letsencrypt-dns on the Youzoune VPS (README).
       - traefik.enable=true
       - traefik.http.routers.relais-projects-http.rule=HostRegexp(`^[a-z0-9-]+\.${RELAIS_PROJECTS_DOMAIN}$$`)
       - traefik.http.routers.relais-projects-http.entryPoints=http
@@ -58,7 +59,7 @@ services:
       - traefik.http.routers.relais-projects-https.entryPoints=https
       - traefik.http.routers.relais-projects-https.priority=1
       - traefik.http.routers.relais-projects-https.tls=true
-      - traefik.http.routers.relais-projects-https.tls.certresolver=letsencrypt
+      - traefik.http.routers.relais-projects-https.tls.certresolver=${RELAIS_WILDCARD_CERT_RESOLVER:-letsencrypt-dns}
       - traefik.http.routers.relais-projects-https.tls.domains[0].main=${RELAIS_PROJECTS_DOMAIN}
       - traefik.http.routers.relais-projects-https.tls.domains[0].sans=*.${RELAIS_PROJECTS_DOMAIN}
       - traefik.http.routers.relais-projects-https.service=relais-projects
