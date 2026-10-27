@@ -23,7 +23,8 @@ const (
 
 // QueryCampaigns retrieves paginated campaigns optionally filtering them by the given arbitrary
 // query expression. It also returns the total number of records in the DB.
-func (c *Core) QueryCampaigns(searchStr string, statuses, tags []string, typ, orderBy, order string, getAll bool, permittedLists []int, offset, limit int) (models.Campaigns, int, error) {
+// projectID 0 returns campaigns from all projects.
+func (c *Core) QueryCampaigns(searchStr string, statuses, tags []string, typ, orderBy, order string, getAll bool, permittedLists []int, projectID, offset, limit int) (models.Campaigns, int, error) {
 	queryStr, stmt := makeSearchQuery(searchStr, orderBy, order, c.q.QueryCampaigns, campQuerySortFields)
 
 	if statuses == nil {
@@ -36,7 +37,7 @@ func (c *Core) QueryCampaigns(searchStr string, statuses, tags []string, typ, or
 
 	// Unsafe to ignore scanning fields not present in models.Campaigns.
 	var out models.Campaigns
-	if err := c.db.Select(&out, stmt, 0, pq.StringArray(statuses), pq.StringArray(tags), queryStr, typ, getAll, pq.Array(permittedLists), offset, limit); err != nil {
+	if err := c.db.Select(&out, stmt, 0, pq.StringArray(statuses), pq.StringArray(tags), queryStr, typ, getAll, pq.Array(permittedLists), offset, limit, projectID); err != nil {
 		c.log.Printf("error fetching campaigns: %v", err)
 		return nil, 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.campaign}", "error", pqErrMsg(err)))
@@ -143,9 +144,10 @@ func (c *Core) GetCampaignForPreview(id, tplID int) (models.Campaign, error) {
 }
 
 // GetArchivedCampaigns retrieves campaigns with a template body.
-func (c *Core) GetArchivedCampaigns(offset, limit int) (models.Campaigns, int, error) {
+// GetArchivedCampaigns returns the public archive of a project (0 = all projects).
+func (c *Core) GetArchivedCampaigns(offset, limit, projectID int) (models.Campaigns, int, error) {
 	var out models.Campaigns
-	if err := c.q.GetArchivedCampaigns.Select(&out, offset, limit, campaignTplArchive); err != nil {
+	if err := c.q.GetArchivedCampaigns.Select(&out, offset, limit, campaignTplArchive, projectID); err != nil {
 		c.log.Printf("error fetching public campaigns: %v", err)
 		return models.Campaigns{}, 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.campaign}", "error", pqErrMsg(err)))
@@ -192,6 +194,7 @@ func (c *Core) CreateCampaign(o models.Campaign, listIDs []int, mediaIDs []int) 
 		o.ArchiveMeta,
 		pq.Array(mediaIDs),
 		o.BodySource,
+		o.ProjectID,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			return models.Campaign{}, echo.NewHTTPError(http.StatusBadRequest, c.i18n.T("campaigns.noSubs"))
@@ -333,7 +336,8 @@ func (c *Core) DeleteCampaign(id int) error {
 }
 
 // DeleteCampaigns deletes multiple campaigns by IDs or by query.
-func (c *Core) DeleteCampaigns(ids []int, query string, statuses, tags []string, typ string, hasAllPerm bool, permittedLists []int) error {
+// projectID 0 deletes matching campaigns from all projects.
+func (c *Core) DeleteCampaigns(ids []int, query string, statuses, tags []string, typ string, hasAllPerm bool, permittedLists []int, projectID int) error {
 	var queryStr string
 
 	if len(ids) > 0 {
@@ -342,7 +346,7 @@ func (c *Core) DeleteCampaigns(ids []int, query string, statuses, tags []string,
 		queryStr = makeSearchString(query)
 	}
 
-	if _, err := c.q.DeleteCampaigns.Exec(pq.Array(ids), queryStr, hasAllPerm, pq.Array(permittedLists), pq.Array(statuses), pq.Array(tags), typ); err != nil {
+	if _, err := c.q.DeleteCampaigns.Exec(pq.Array(ids), queryStr, hasAllPerm, pq.Array(permittedLists), pq.Array(statuses), pq.Array(tags), typ, projectID); err != nil {
 		c.log.Printf("error deleting campaigns: %v", err)
 		return echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorDeleting", "name", "{globals.terms.campaigns}", "error", pqErrMsg(err)))

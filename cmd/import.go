@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/knadh/listmonk/internal/auth"
+	"github.com/knadh/listmonk/internal/core"
 	"github.com/knadh/listmonk/internal/subimporter"
 	"github.com/knadh/listmonk/models"
 	"github.com/labstack/echo/v5"
@@ -130,6 +131,12 @@ func (a *App) ImportSubscribers(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError,
 			a.i18n.Ts("globals.messages.errorCopyingFile", "error", err.Error()))
 	}
+
+	// Subscribers are imported into the current project, and only into its lists.
+	if err := a.requireOwned(c, core.EntityList, opt.ListIDs...); err != nil {
+		return err
+	}
+	opt.ProjectID = projectID(c)
 
 	// Start the importer session.
 	opt.Filename = file.Filename

@@ -147,6 +147,7 @@ func installLists(q *models.Queries) (int, int) {
 		models.ListStatusActive,
 		pq.StringArray{"test"},
 		"",
+		models.DefaultProjectID,
 	); err != nil {
 		lo.Fatalf("error creating list: %v", err)
 	}
@@ -158,6 +159,7 @@ func installLists(q *models.Queries) (int, int) {
 		models.ListStatusActive,
 		pq.StringArray{"test"},
 		"",
+		models.DefaultProjectID,
 	); err != nil {
 		lo.Fatalf("error creating list: %v", err)
 	}
@@ -174,7 +176,7 @@ func installSubs(defListID, optinListID int, q *models.Queries) {
 		`{"type": "known", "good": true, "city": "Bengaluru"}`,
 		pq.Int64Array{int64(defListID)},
 		models.SubscriptionStatusUnconfirmed,
-		true, true); err != nil {
+		true, true, models.DefaultProjectID); err != nil {
 		lo.Fatalf("Error creating subscriber: %v", err)
 	}
 	if _, err := q.UpsertSubscriber.Exec(
@@ -184,7 +186,7 @@ func installSubs(defListID, optinListID int, q *models.Queries) {
 		`{"type": "unknown", "good": true, "city": "Bengaluru"}`,
 		pq.Int64Array{int64(optinListID)},
 		models.SubscriptionStatusUnconfirmed,
-		true, true); err != nil {
+		true, true, models.DefaultProjectID); err != nil {
 		lo.Fatalf("error creating subscriber: %v", err)
 	}
 }
@@ -197,7 +199,7 @@ func installTemplates(q *models.Queries) (int, int) {
 	}
 
 	var campTplID int
-	if err := q.CreateTemplate.Get(&campTplID, "Default campaign template", models.TemplateTypeCampaign, "", campTpl.ReadBytes(), nil); err != nil {
+	if err := q.CreateTemplate.Get(&campTplID, "Default campaign template", models.TemplateTypeCampaign, "", campTpl.ReadBytes(), nil, models.DefaultProjectID); err != nil {
 		lo.Fatalf("error creating default campaign template: %v", err)
 	}
 	if _, err := q.SetDefaultTemplate.Exec(campTplID); err != nil {
@@ -211,7 +213,7 @@ func installTemplates(q *models.Queries) (int, int) {
 	}
 
 	var archiveTplID int
-	if err := q.CreateTemplate.Get(&archiveTplID, "Default archive template", models.TemplateTypeCampaign, "", archiveTpl.ReadBytes(), nil); err != nil {
+	if err := q.CreateTemplate.Get(&archiveTplID, "Default archive template", models.TemplateTypeCampaign, "", archiveTpl.ReadBytes(), nil, models.DefaultProjectID); err != nil {
 		lo.Fatalf("error creating default campaign template: %v", err)
 	}
 
@@ -221,7 +223,7 @@ func installTemplates(q *models.Queries) (int, int) {
 		lo.Fatalf("error reading default e-mail template: %v", err)
 	}
 
-	if _, err := q.CreateTemplate.Exec("Sample transactional template", models.TemplateTypeTx, "Welcome {{ .Subscriber.Name }}", txTpl.ReadBytes(), nil); err != nil {
+	if _, err := q.CreateTemplate.Exec("Sample transactional template", models.TemplateTypeTx, "Welcome {{ .Subscriber.Name }}", txTpl.ReadBytes(), nil, models.DefaultProjectID); err != nil {
 		lo.Fatalf("error creating sample transactional template: %v", err)
 	}
 
@@ -235,7 +237,7 @@ func installTemplates(q *models.Queries) (int, int) {
 		lo.Fatalf("error reading default visual template json: %v", err)
 	}
 
-	if _, err := q.CreateTemplate.Exec("Sample visual template", models.TemplateTypeCampaignVisual, "", visualTpl.ReadBytes(), visualSrc.ReadBytes()); err != nil {
+	if _, err := q.CreateTemplate.Exec("Sample visual template", models.TemplateTypeCampaignVisual, "", visualTpl.ReadBytes(), visualSrc.ReadBytes(), models.DefaultProjectID); err != nil {
 		lo.Fatalf("error creating default campaign template: %v", err)
 	}
 
@@ -272,6 +274,7 @@ func installCampaign(campTplID, archiveTplID int, q *models.Queries) {
 		`{"name": "Subscriber"}`,
 		nil,
 		nil,
+		models.DefaultProjectID,
 	); err != nil {
 		lo.Fatalf("error creating sample campaign: %v", err)
 	}

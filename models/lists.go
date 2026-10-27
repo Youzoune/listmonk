@@ -19,6 +19,7 @@ type List struct {
 	Base
 
 	UUID             string         `db:"uuid" json:"uuid"`
+	ProjectID        int            `db:"project_id" json:"project_id"`
 	Name             string         `db:"name" json:"name"`
 	Type             string         `db:"type" json:"type"`
 	Optin            string         `db:"optin" json:"optin"`

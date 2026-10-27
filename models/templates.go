@@ -33,7 +33,8 @@ func (t *tplRenderer) ExecuteTemplate(w io.Writer, name string, data any) error 
 type Template struct {
 	Base
 
-	Name string `db:"name" json:"name"`
+	ProjectID int    `db:"project_id" json:"project_id"`
+	Name      string `db:"name" json:"name"`
 	// Subject is only for type=tx.
 	Subject    string      `db:"subject" json:"subject"`
 	Type       string      `db:"type" json:"type"`

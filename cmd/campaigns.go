@@ -9,11 +9,13 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/knadh/listmonk/internal/auth"
+	"github.com/knadh/listmonk/internal/core"
 	"github.com/knadh/listmonk/internal/messenger/email"
 	"github.com/knadh/listmonk/internal/notifs"
 	"github.com/knadh/listmonk/models"
@@ -89,7 +91,7 @@ func (a *App) ViewNewCampaign(c *echo.Context) error {
 	var tpls []models.Template
 	if can(auth.GetUser(c), auth.PermTemplatesGet) {
 		var err error
-		tpls, err = a.core.GetTemplates("", "", true, "", "")
+		tpls, err = a.core.GetTemplates("", "", true, "", "", projectID(c))
 		if err != nil {
 			return err
 		}
@@ -166,7 +168,7 @@ func (a *App) ViewCampaign(c *echo.Context) error {
 	var tpls []models.Template
 	if can(auth.GetUser(c), auth.PermTemplatesGet) {
 		var err error
-		tpls, err = a.core.GetTemplates("", "", true, "", "")
+		tpls, err = a.core.GetTemplates("", "", true, "", "", projectID(c))
 		if err != nil {
 			return err
 		}
@@ -234,7 +236,7 @@ func (a *App) getViewCampaigns(c *echo.Context, listIDs ...int) ([]models.Campai
 	// Run the DB query.
 	pg := a.pg.NewFromURL(q)
 	res, total, err := a.core.QueryCampaigns(q.Get("query"), q["status"], q["tag"], q.Get("type"),
-		q.Get("order_by"), q.Get("order"), hasAllPerm, permittedLists, pg.Offset, pg.Limit)
+		q.Get("order_by"), q.Get("order"), hasAllPerm, permittedLists, projectID(c), pg.Offset, pg.Limit)
 	if err != nil {
 		return nil, models.PageProps{}, err
 	}
@@ -277,7 +279,7 @@ func (a *App) GetCampaigns(c *echo.Context) error {
 	)
 
 	// Query and retrieve campaigns from the DB.
-	res, total, err := a.core.QueryCampaigns(query, status, tags, typ, orderBy, order, hasAllPerm, permittedLists, pg.Offset, pg.Limit)
+	res, total, err := a.core.QueryCampaigns(query, status, tags, typ, orderBy, order, hasAllPerm, permittedLists, projectID(c), pg.Offset, pg.Limit)
 	if err != nil {
 		return err
 	}
@@ -490,6 +492,12 @@ func (a *App) CreateCampaign(c *echo.Context) error {
 		o.ArchiveTemplateID = o.TemplateID
 	}
 
+	// The campaign, its lists, media and templates all live in the current project.
+	if err := a.checkCampaignRefs(c, o); err != nil {
+		return err
+	}
+	o.ProjectID = projectID(c)
+
 	out, err := a.core.CreateCampaign(o.Campaign, o.ListIDs, o.MediaIDs)
 	if err != nil {
 		return err
@@ -540,6 +548,10 @@ func (a *App) UpdateCampaign(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	} else {
 		o = c
+	}
+
+	if err := a.checkCampaignRefs(c, o); err != nil {
+		return err
 	}
 
 	out, err := a.core.UpdateCampaign(id, o.Campaign, o.ListIDs, o.MediaIDs)
@@ -677,7 +689,7 @@ func (a *App) DeleteCampaigns(c *echo.Context) error {
 	}
 
 	// Delete the campaigns from the DB.
-	if err := a.core.DeleteCampaigns(ids, query, c.QueryParams()["status"], c.QueryParams()["tag"], c.QueryParam("type"), hasAllPerm, permittedLists); err != nil {
+	if err := a.core.DeleteCampaigns(ids, query, c.QueryParams()["status"], c.QueryParams()["tag"], c.QueryParam("type"), hasAllPerm, permittedLists, projectID(c)); err != nil {
 		return err
 	}
 
@@ -687,9 +699,25 @@ func (a *App) DeleteCampaigns(c *echo.Context) error {
 // GetRunningCampaignStats returns stats of a given set of campaign IDs.
 func (a *App) GetRunningCampaignStats(c *echo.Context) error {
 	// Get the running campaign stats from the DB.
-	out, err := a.core.GetRunningCampaignStats()
+	all, err := a.core.GetRunningCampaignStats()
 	if err != nil {
 		return err
+	}
+
+	// Keep the current project's campaigns.
+	ids := make([]int, len(all))
+	for i, s := range all {
+		ids[i] = s.ID
+	}
+	owned, err := a.core.FilterOwned(core.EntityCampaign, ids, projectID(c))
+	if err != nil {
+		return err
+	}
+	out := make([]models.CampaignStats, 0, len(owned))
+	for _, s := range all {
+		if slices.Contains(owned, s.ID) {
+			out = append(out, s)
+		}
 	}
 
 	if len(out) == 0 {
@@ -753,7 +781,7 @@ func (a *App) TestCampaign(c *echo.Context) error {
 	}
 
 	// Get the subscribers from the DB by their e-mails.
-	subs, err := a.core.GetSubscribersByEmail(req.SubscriberEmails)
+	subs, err := a.core.GetSubscribersByEmail(req.SubscriberEmails, projectID(c))
 	if err != nil {
 		return err
 	}
@@ -1007,4 +1035,23 @@ func canEditCampaign(status string) bool {
 	return status == models.CampaignStatusDraft ||
 		status == models.CampaignStatusPaused ||
 		status == models.CampaignStatusScheduled
+}
+
+// checkCampaignRefs checks that the lists, media and templates a campaign
+// refers to belong to the request's project.
+func (a *App) checkCampaignRefs(c *echo.Context, o campReq) error {
+	if err := a.requireOwned(c, core.EntityList, o.ListIDs...); err != nil {
+		return err
+	}
+	if err := a.requireOwned(c, core.EntityMedia, o.MediaIDs...); err != nil {
+		return err
+	}
+
+	var tplIDs []int
+	for _, t := range []null.Int{o.TemplateID, o.ArchiveTemplateID} {
+		if t.Valid && t.Int > 0 {
+			tplIDs = append(tplIDs, int(t.Int))
+		}
+	}
+	return a.requireOwned(c, core.EntityTemplate, tplIDs...)
 }

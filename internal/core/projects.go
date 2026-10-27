@@ -164,3 +164,55 @@ func (c *Core) projectConflictErr(err error) error {
 
 	return nil
 }
+
+// Entities that belong to a project, and how to find the project of a row.
+const (
+	EntityList       = "list"
+	EntityCampaign   = "campaign"
+	EntitySubscriber = "subscriber"
+	EntityTemplate   = "template"
+	EntityMedia      = "media"
+	EntityBounce     = "bounce"
+)
+
+var ownedQueries = map[string]string{
+	EntityList:       `SELECT id FROM lists WHERE id = ANY($1) AND project_id = $2`,
+	EntityCampaign:   `SELECT id FROM campaigns WHERE id = ANY($1) AND project_id = $2`,
+	EntitySubscriber: `SELECT id FROM subscribers WHERE id = ANY($1) AND project_id = $2`,
+	EntityTemplate:   `SELECT id FROM templates WHERE id = ANY($1) AND project_id = $2`,
+	EntityMedia:      `SELECT id FROM media WHERE id = ANY($1) AND project_id = $2`,
+	EntityBounce: `SELECT b.id FROM bounces b JOIN subscribers s ON (s.id = b.subscriber_id)
+		WHERE b.id = ANY($1) AND s.project_id = $2`,
+}
+
+// FilterOwned returns the IDs among ids whose rows belong to the given project.
+func (c *Core) FilterOwned(entity string, ids []int, projectID int) ([]int, error) {
+	q, ok := ownedQueries[entity]
+	if !ok {
+		return nil, echo.NewHTTPError(http.StatusInternalServerError, "unknown entity: "+entity)
+	}
+
+	out := []int{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	if err := c.db.Select(&out, q, pq.Array(ids), projectID); err != nil {
+		c.log.Printf("error checking %s ownership: %v", entity, err)
+		return nil, echo.NewHTTPError(http.StatusInternalServerError,
+			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.project}", "error", pqErrMsg(err)))
+	}
+
+	return out, nil
+}
+
+// GetListsProjects returns the distinct projects of the given lists (by UUID).
+func (c *Core) GetListsProjects(listUUIDs []string) ([]int, error) {
+	out := []int{}
+	if err := c.db.Select(&out, `SELECT DISTINCT project_id FROM lists WHERE uuid = ANY($1::UUID[])`, pq.Array(listUUIDs)); err != nil {
+		c.log.Printf("error fetching list projects: %v", err)
+		return nil, echo.NewHTTPError(http.StatusInternalServerError,
+			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.lists}", "error", pqErrMsg(err)))
+	}
+
+	return out, nil
+}

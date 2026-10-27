@@ -14,14 +14,15 @@ import (
 )
 
 // QueryMedia returns media entries optionally filtered by a query string.
-func (c *Core) QueryMedia(provider string, s media.Store, query string, offset, limit int) ([]media.Media, int, error) {
+// projectID limits the results to a project (0 = all projects).
+func (c *Core) QueryMedia(provider string, s media.Store, query string, projectID, offset, limit int) ([]media.Media, int, error) {
 	out := []media.Media{}
 
 	if query != "" {
 		query = strings.ToLower(query)
 	}
 
-	if err := c.q.QueryMedia.Select(&out, fmt.Sprintf("%%%s%%", query), provider, offset, limit); err != nil {
+	if err := c.q.QueryMedia.Select(&out, fmt.Sprintf("%%%s%%", query), provider, offset, limit, projectID); err != nil {
 		return out, 0, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching",
 				"name", "{globals.terms.media}", "error", pqErrMsg(err)))
@@ -70,7 +71,7 @@ func (c *Core) GetMedia(id int, uuid, fileName string, s media.Store) (media.Med
 }
 
 // InsertMedia inserts a new media file into the DB.
-func (c *Core) InsertMedia(fileName, thumbName, contentType string, meta models.JSON, provider string, s media.Store) (media.Media, error) {
+func (c *Core) InsertMedia(fileName, thumbName, contentType string, meta models.JSON, provider string, s media.Store, projectID int) (media.Media, error) {
 	uu, err := uuid.NewV4()
 	if err != nil {
 		c.log.Printf("error generating UUID: %v", err)
@@ -80,7 +81,7 @@ func (c *Core) InsertMedia(fileName, thumbName, contentType string, meta models.
 
 	// Write to the DB.
 	var newID int
-	if err := c.q.InsertMedia.Get(&newID, uu, fileName, thumbName, contentType, provider, meta); err != nil {
+	if err := c.q.InsertMedia.Get(&newID, uu, fileName, thumbName, contentType, provider, meta, projectID); err != nil {
 		c.log.Printf("error inserting uploaded file to db: %v", err)
 		return media.Media{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.media}", "error", pqErrMsg(err)))

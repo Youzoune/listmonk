@@ -57,6 +57,7 @@ type Campaign struct {
 	CampaignMeta
 
 	UUID              string          `db:"uuid" json:"uuid"`
+	ProjectID         int             `db:"project_id" json:"project_id"`
 	Type              string          `db:"type" json:"type"`
 	Name              string          `db:"name" json:"name"`
 	Subject           string          `db:"subject" json:"subject"`

@@ -9,8 +9,9 @@ import (
 	null "gopkg.in/volatiletech/null.v6"
 )
 
-// GetTemplates retrieves templates filtered by name and type.
-func (c *Core) GetTemplates(searchStr, typ string, noBody bool, orderBy, order string) ([]models.Template, error) {
+// GetTemplates retrieves templates filtered by name and type. projectID 0
+// returns templates from all projects.
+func (c *Core) GetTemplates(searchStr, typ string, noBody bool, orderBy, order string, projectID int) ([]models.Template, error) {
 	if order == "" {
 		order = models.OrderAsc
 	}
@@ -19,7 +20,7 @@ func (c *Core) GetTemplates(searchStr, typ string, noBody bool, orderBy, order s
 		out            = []models.Template{}
 		queryStr, stmt = makeSearchQuery(searchStr, orderBy, order, c.q.GetTemplates, templateQuerySortFields)
 	)
-	if err := c.db.Select(&out, stmt, 0, noBody, typ, queryStr); err != nil {
+	if err := c.db.Select(&out, stmt, 0, noBody, typ, queryStr, projectID); err != nil {
 		return nil, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.templates}", "error", pqErrMsg(err)))
 	}
@@ -33,7 +34,7 @@ func (c *Core) GetTemplate(id int, noBody bool) (models.Template, error) {
 		out     []models.Template
 		_, stmt = makeSearchQuery("", "", models.OrderAsc, c.q.GetTemplates, templateQuerySortFields)
 	)
-	if err := c.db.Select(&out, stmt, id, noBody, "", ""); err != nil {
+	if err := c.db.Select(&out, stmt, id, noBody, "", "", 0); err != nil {
 		return models.Template{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.templates}", "error", pqErrMsg(err)))
 	}
@@ -46,10 +47,10 @@ func (c *Core) GetTemplate(id int, noBody bool) (models.Template, error) {
 	return out[0], nil
 }
 
-// CreateTemplate creates a new template.
-func (c *Core) CreateTemplate(name, typ, subject string, body []byte, bodySource null.String) (models.Template, error) {
+// CreateTemplate creates a new template in the given project.
+func (c *Core) CreateTemplate(name, typ, subject string, body []byte, bodySource null.String, projectID int) (models.Template, error) {
 	var newID int
-	if err := c.q.CreateTemplate.Get(&newID, name, typ, subject, body, bodySource); err != nil {
+	if err := c.q.CreateTemplate.Get(&newID, name, typ, subject, body, bodySource, projectID); err != nil {
 		return models.Template{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorCreating", "name", "{globals.terms.template}", "error", pqErrMsg(err)))
 	}

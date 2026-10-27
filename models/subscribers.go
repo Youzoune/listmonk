@@ -32,12 +32,13 @@ type Subscribers []Subscriber
 type Subscriber struct {
 	Base
 
-	UUID    string         `db:"uuid" json:"uuid"`
-	Email   string         `db:"email" json:"email" form:"email"`
-	Name    string         `db:"name" json:"name" form:"name"`
-	Attribs JSON           `db:"attribs" json:"attribs"`
-	Status  string         `db:"status" json:"status"`
-	Lists   types.JSONText `db:"lists" json:"lists"`
+	UUID      string         `db:"uuid" json:"uuid"`
+	ProjectID int            `db:"project_id" json:"project_id"`
+	Email     string         `db:"email" json:"email" form:"email"`
+	Name      string         `db:"name" json:"name" form:"name"`
+	Attribs   JSON           `db:"attribs" json:"attribs"`
+	Status    string         `db:"status" json:"status"`
+	Lists     types.JSONText `db:"lists" json:"lists"`
 }
 
 type subLists struct {

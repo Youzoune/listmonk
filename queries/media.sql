@@ -1,10 +1,13 @@
 -- media
 -- name: insert-media
-INSERT INTO media (uuid, filename, thumb, content_type, provider, meta, created_at) VALUES($1, $2, $3, $4, $5, $6, NOW()) RETURNING id;
+INSERT INTO media (uuid, filename, thumb, content_type, provider, meta, created_at, project_id) VALUES($1, $2, $3, $4, $5, $6, NOW(), $7) RETURNING id;
 
 -- name: query-media
 SELECT COUNT(*) OVER () AS total, * FROM media
-    WHERE ($1 = '' OR filename ILIKE $1) AND provider=$2 ORDER BY created_at DESC OFFSET $3 LIMIT $4;
+    WHERE ($1 = '' OR filename ILIKE $1) AND provider=$2
+    -- Optional project (0 = all projects).
+    AND ($5 = 0 OR project_id = $5)
+    ORDER BY created_at DESC OFFSET $3 LIMIT $4;
 
 -- name: get-media
 SELECT * FROM media WHERE

@@ -20,12 +20,13 @@ WITH tpl AS (
             WHEN $14::INT IS NOT NULL THEN id = $14::INT
             ELSE $8 != 'visual' AND is_default = TRUE
         END
+        AND project_id = $22
     LIMIT 1
 ),
 camp AS (
     INSERT INTO campaigns (uuid, type, name, subject, from_email, body, altbody,
         content_type, send_at, headers, attribs, tags, messenger, template_id, to_send,
-        max_subscriber_id, archive, archive_slug, archive_template_id, archive_meta, body_source)
+        max_subscriber_id, archive, archive_slug, archive_template_id, archive_meta, body_source, project_id)
         SELECT $1, $2, $3, $4, $5,
             -- body
             COALESCE(NULLIF($6, ''), (SELECT body FROM tpl), ''),
@@ -40,16 +41,17 @@ camp AS (
             $18,
             $19,
             -- body_source
-            COALESCE($21, (SELECT body_source FROM tpl))
+            COALESCE($21, (SELECT body_source FROM tpl)),
+            $22
         RETURNING id
 ),
 med AS (
     INSERT INTO campaign_media (campaign_id, media_id, filename)
-        (SELECT (SELECT id FROM camp), id, filename FROM media WHERE id=ANY($20::INT[]))
+        (SELECT (SELECT id FROM camp), id, filename FROM media WHERE id=ANY($20::INT[]) AND project_id = $22)
 ),
 insLists AS (
     INSERT INTO campaign_lists (campaign_id, list_id, list_name)
-        SELECT (SELECT id FROM camp), id, name FROM lists WHERE id=ANY($15::INT[])
+        SELECT (SELECT id FROM camp), id, name FROM lists WHERE id=ANY($15::INT[]) AND project_id = $22
 )
 SELECT id FROM camp;
 
@@ -81,11 +83,13 @@ WHERE ($1 = 0 OR id = $1)
             SELECT 1 FROM campaign_lists WHERE campaign_id = c.id AND list_id = ANY($7::INT[])
         )
     )
+    -- Optional project (0 = all projects).
+    AND ($10 = 0 OR c.project_id = $10)
 ORDER BY %order% OFFSET $8 LIMIT (CASE WHEN $9 < 1 THEN NULL ELSE $9 END);
 
 -- name: get-campaign
 SELECT campaigns.*,
-    COALESCE(templates.body, (SELECT body FROM templates WHERE is_default = true LIMIT 1), '') AS template_body
+    COALESCE(templates.body, (SELECT body FROM templates t WHERE t.is_default = true AND t.project_id = campaigns.project_id LIMIT 1), '') AS template_body
     FROM campaigns
     LEFT JOIN templates ON (
         CASE WHEN $4 = 'default' THEN templates.id = campaigns.template_id
@@ -99,13 +103,15 @@ SELECT campaigns.*,
 
 -- name: get-archived-campaigns
 SELECT COUNT(*) OVER () AS total, campaigns.*,
-    COALESCE(templates.body, (SELECT body FROM templates WHERE is_default = true LIMIT 1), '') AS template_body
+    COALESCE(templates.body, (SELECT body FROM templates t WHERE t.is_default = true AND t.project_id = campaigns.project_id LIMIT 1), '') AS template_body
     FROM campaigns
     LEFT JOIN templates ON (
         CASE WHEN $3 = 'default' THEN templates.id = campaigns.template_id
         ELSE templates.id = campaigns.archive_template_id END
     )
     WHERE campaigns.archive=true AND campaigns.type='regular' AND campaigns.status=ANY('{running, paused, finished}')
+    -- Optional project (0 = all projects).
+    AND ($4 = 0 OR campaigns.project_id = $4)
     ORDER by campaigns.started_at DESC NULLS LAST, campaigns.id DESC OFFSET $1 LIMIT $2;
 
 -- name: get-campaign-stats
@@ -181,7 +187,7 @@ SELECT EXISTS (
 -- a campaign. This is used to fetch and slice subscribers for the campaign in next-campaign-subscribers.
 WITH camps AS (
     -- Get all running campaigns and their template bodies (if the template's deleted, the default template body instead)
-    SELECT campaigns.*, COALESCE(templates.body, (SELECT body FROM templates WHERE is_default = true LIMIT 1), '') AS template_body
+    SELECT campaigns.*, COALESCE(templates.body, (SELECT body FROM templates t WHERE t.is_default = true AND t.project_id = campaigns.project_id LIMIT 1), '') AS template_body
     FROM campaigns
     LEFT JOIN templates ON (templates.id = campaigns.template_id)
     WHERE (status='running' OR (status='scheduled' AND NOW() >= campaigns.send_at))
@@ -407,11 +413,13 @@ med AS (
 ),
 medi AS (
     INSERT INTO campaign_media (campaign_id, media_id, filename)
-        (SELECT $1 AS campaign_id, id, filename FROM media WHERE id=ANY($19::INT[]))
+        (SELECT $1 AS campaign_id, id, filename FROM media WHERE id=ANY($19::INT[])
+            AND project_id = (SELECT project_id FROM campaigns WHERE id = $1))
         ON CONFLICT (campaign_id, media_id) DO NOTHING
 )
 INSERT INTO campaign_lists (campaign_id, list_id, list_name)
-    (SELECT $1 as campaign_id, id, name FROM lists WHERE id=ANY($14::INT[]))
+    (SELECT $1 as campaign_id, id, name FROM lists WHERE id=ANY($14::INT[])
+        AND project_id = (SELECT project_id FROM campaigns WHERE id = $1))
     ON CONFLICT (campaign_id, list_id) DO UPDATE SET list_name = EXCLUDED.list_name;
 
 -- name: update-campaign-counts
@@ -461,7 +469,9 @@ AND (
     $3 OR EXISTS (
         SELECT 1 FROM campaign_lists WHERE campaign_id = c.id AND list_id = ANY($4::INT[])
     )
-);
+)
+-- Optional project (0 = all projects).
+AND ($8 = 0 OR c.project_id = $8);
 
 -- name: register-campaign-view
 WITH view AS (

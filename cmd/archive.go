@@ -194,7 +194,7 @@ func (a *App) CampaignArchivePageLatest(c *echo.Context) error {
 
 // getCampaignArchives fetches the public campaign archives from the DB.
 func (a *App) getCampaignArchives(offset, limit int, renderBody bool) ([]campArchive, int, error) {
-	pubCamps, total, err := a.core.GetArchivedCampaigns(offset, limit)
+	pubCamps, total, err := a.core.GetArchivedCampaigns(offset, limit, models.DefaultProjectID)
 	if err != nil {
 		return []campArchive{}, total, echo.NewHTTPError(http.StatusInternalServerError, a.i18n.T("public.errorFetchingCampaign"))
 	}

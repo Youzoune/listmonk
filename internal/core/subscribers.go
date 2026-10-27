@@ -39,14 +39,16 @@ var (
 )
 
 // GetSubscriber fetches a subscriber by one of the given params.
-func (c *Core) GetSubscriber(id int, uuid, email string) (models.Subscriber, error) {
+// GetSubscriber returns a subscriber by ID, UUID or e-mail. E-mails are unique
+// per project, so e-mail lookups are limited to projectID (0 = any project).
+func (c *Core) GetSubscriber(id int, uuid, email string, projectID int) (models.Subscriber, error) {
 	var uu any
 	if uuid != "" {
 		uu = uuid
 	}
 
 	var out models.Subscribers
-	if err := c.q.GetSubscriber.Select(&out, id, uu, email); err != nil {
+	if err := c.q.GetSubscriber.Select(&out, id, uu, email, projectID); err != nil {
 		c.log.Printf("error fetching subscriber: %v", err)
 		return models.Subscriber{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching",
@@ -91,10 +93,11 @@ func (c *Core) HasSubscriberLists(subIDs []int, listIDs []int) (map[int]bool, er
 }
 
 // GetSubscribersByEmail fetches a subscriber by one of the given params.
-func (c *Core) GetSubscribersByEmail(emails []string) (models.Subscribers, error) {
+// GetSubscribersByEmail returns the subscribers of a project (0 = any project) by e-mail.
+func (c *Core) GetSubscribersByEmail(emails []string, projectID int) (models.Subscribers, error) {
 	var out models.Subscribers
 
-	if err := c.q.GetSubscribersByEmails.Select(&out, pq.Array(emails)); err != nil {
+	if err := c.q.GetSubscribersByEmails.Select(&out, pq.Array(emails), projectID); err != nil {
 		c.log.Printf("error fetching subscriber: %v", err)
 		return nil, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorFetching", "name", "{globals.terms.subscriber}", "error", pqErrMsg(err)))
@@ -113,7 +116,8 @@ func (c *Core) GetSubscribersByEmail(emails []string) (models.Subscribers, error
 }
 
 // QuerySubscribers queries and returns paginated subscrribers based on the given params including the total count.
-func (c *Core) QuerySubscribers(searchStr, queryExp string, listIDs []int, subStatus, subscriberStatus string, order, orderBy string, offset, limit int) (models.Subscribers, int, error) {
+// projectID limits the results to a project (0 = all projects).
+func (c *Core) QuerySubscribers(searchStr, queryExp string, listIDs []int, subStatus, subscriberStatus string, order, orderBy string, projectID, offset, limit int) (models.Subscribers, int, error) {
 	// Sort params.
 	if !strSliceContains(orderBy, subQuerySortFields) {
 		orderBy = "subscribers.id"
@@ -135,6 +139,7 @@ func (c *Core) QuerySubscribers(searchStr, queryExp string, listIDs []int, subSt
 
 	// Handle the special "none" subscription status for orphan subscribers.
 	cond, subStatus = models.ApplyOrphanFilter(cond, subStatus)
+	cond = scopeSubQuery(cond, projectID)
 
 	// stmt is the raw SQL query.
 	stmt := strings.ReplaceAll(c.q.QuerySubscribers, "%query%", cond)
@@ -276,7 +281,8 @@ func (c *Core) DeleteSubscriberActivity(id int, activityType string) error {
 // on the given criteria in an exportable form. The iterator function returned can be called
 // repeatedly until there are nil subscribers. It's an iterator because exports can be extremely
 // large and may have to be fetched in batches from the DB and streamed somewhere.
-func (c *Core) ExportSubscribers(searchStr, query string, subIDs, listIDs []int, subStatus, subscriberStatus string, batchSize int) (func() ([]models.SubscriberExport, error), error) {
+// projectID limits the export to a project (0 = all projects).
+func (c *Core) ExportSubscribers(searchStr, query string, subIDs, listIDs []int, subStatus, subscriberStatus string, projectID, batchSize int) (func() ([]models.SubscriberExport, error), error) {
 	if subIDs == nil {
 		subIDs = []int{}
 	}
@@ -292,6 +298,7 @@ func (c *Core) ExportSubscribers(searchStr, query string, subIDs, listIDs []int,
 
 	// Handle the special "none" subscription status for orphan subscribers.
 	cond, subStatus = models.ApplyOrphanFilter(cond, subStatus)
+	cond = scopeSubQuery(cond, projectID)
 
 	stmt := strings.ReplaceAll(c.q.QuerySubscribersForExport, "%query%", cond)
 
@@ -371,7 +378,8 @@ func (c *Core) InsertSubscriber(sub models.Subscriber, listIDs []int, listUUIDs 
 		sub.Attribs,
 		pq.Array(listIDs),
 		pq.Array(listUUIDs),
-		subStatus); err != nil {
+		subStatus,
+		sub.ProjectID); err != nil {
 		if pqErr, ok := err.(*pq.Error); ok && pqErr.Constraint == "idx_subs_project_email" {
 			return models.Subscriber{}, false, echo.NewHTTPError(http.StatusConflict, c.i18n.T("subscribers.emailExists"))
 		} else {
@@ -384,7 +392,7 @@ func (c *Core) InsertSubscriber(sub models.Subscriber, listIDs []int, listUUIDs 
 
 	// Fetch the subscriber's full data. If the subscriber already existed and wasn't
 	// created, the id will be empty. Fetch the details by e-mail then.
-	out, err := c.GetSubscriber(sub.ID, "", sub.Email)
+	out, err := c.GetSubscriber(sub.ID, "", sub.Email, sub.ProjectID)
 	if err != nil {
 		return models.Subscriber{}, false, err
 	}
@@ -429,7 +437,7 @@ func (c *Core) UpdateSubscriber(id int, sub models.Subscriber) (models.Subscribe
 			c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.subscriber}", "error", pqErrMsg(err)))
 	}
 
-	out, err := c.GetSubscriber(sub.ID, "", sub.Email)
+	out, err := c.GetSubscriber(sub.ID, "", sub.Email, sub.ProjectID)
 	if err != nil {
 		return models.Subscriber{}, err
 	}
@@ -475,7 +483,7 @@ func (c *Core) UpdateSubscriberWithLists(id int, sub models.Subscriber, listIDs 
 			c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.subscriber}", "error", pqErrMsg(err)))
 	}
 
-	out, err := c.GetSubscriber(sub.ID, "", sub.Email)
+	out, err := c.GetSubscriber(sub.ID, "", sub.Email, sub.ProjectID)
 	if err != nil {
 		return models.Subscriber{}, false, err
 	}
@@ -505,8 +513,8 @@ func (c *Core) BlocklistSubscribers(subIDs []int) error {
 }
 
 // BlocklistSubscribersByQuery blocklists the given list of subscribers.
-func (c *Core) BlocklistSubscribersByQuery(searchStr, queryExp string, listIDs []int, subStatus, subscriberStatus string) error {
-	if err := c.execSubQueryTpl(searchStr, sanitizeSQLExp(queryExp), c.q.BlocklistSubscribersByQuery, listIDs, subStatus, subscriberStatus); err != nil {
+func (c *Core) BlocklistSubscribersByQuery(searchStr, queryExp string, listIDs []int, subStatus, subscriberStatus string, projectID int) error {
+	if err := c.execSubQueryTpl(searchStr, sanitizeSQLExp(queryExp), c.q.BlocklistSubscribersByQuery, listIDs, subStatus, subscriberStatus, projectID); err != nil {
 		c.log.Printf("error blocklisting subscribers: %v", err)
 		return echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("subscribers.errorBlocklisting", "error", pqErrMsg(err)))
@@ -534,8 +542,8 @@ func (c *Core) DeleteSubscribers(subIDs []int, subUUIDs []string) error {
 }
 
 // DeleteSubscribersByQuery deletes subscribers by a given arbitrary query expression.
-func (c *Core) DeleteSubscribersByQuery(searchStr, queryExp string, listIDs []int, subStatus, subscriberStatus string) error {
-	err := c.execSubQueryTpl(searchStr, sanitizeSQLExp(queryExp), c.q.DeleteSubscribersByQuery, listIDs, subStatus, subscriberStatus)
+func (c *Core) DeleteSubscribersByQuery(searchStr, queryExp string, listIDs []int, subStatus, subscriberStatus string, projectID int) error {
+	err := c.execSubQueryTpl(searchStr, sanitizeSQLExp(queryExp), c.q.DeleteSubscribersByQuery, listIDs, subStatus, subscriberStatus, projectID)
 	if err != nil {
 		c.log.Printf("error deleting subscribers: %v", err)
 		return echo.NewHTTPError(http.StatusInternalServerError,
@@ -723,12 +731,13 @@ func traverseQueryPlan(node map[string]any, tables map[string]struct{}) {
 // to filter subscribers from the subscribers table and prepares a query
 // using the raw `query-subscribers-template` template. It sanitizes the
 // query by dry-running it as a read only query.
-func (c *Core) compileSubscriberQueryTpl(searchStr, queryExp string, subStatus, subscriberStatus string) (string, error) {
+func (c *Core) compileSubscriberQueryTpl(searchStr, queryExp string, subStatus, subscriberStatus string, projectID int) (string, error) {
 	// There's an arbitrary query condition.
 	cond := "TRUE"
 	if queryExp != "" {
 		cond = queryExp
 	}
+	cond = scopeSubQuery(cond, projectID)
 
 	// Validate before executing the dry run.
 	stmt := strings.ReplaceAll(c.q.QuerySubscribersTpl, "%query%", cond)
@@ -753,11 +762,11 @@ func (c *Core) compileSubscriberQueryTpl(searchStr, queryExp string, subStatus, 
 // execSubQueryTpl takes an arbitrary WHERE expressions and a subscriber
 // query template that depends on the filter (eg: delete by query, blocklist by query etc.)
 // combines and executes them.
-func (c *Core) execSubQueryTpl(searchStr, queryExp, baseQueryTpl string, listIDs []int, subStatus, subscriberStatus string, args ...any) error {
+func (c *Core) execSubQueryTpl(searchStr, queryExp, baseQueryTpl string, listIDs []int, subStatus, subscriberStatus string, projectID int, args ...any) error {
 	queryExp, subStatus = models.ApplyOrphanFilter(queryExp, subStatus)
 
 	// Perform a dry run.
-	filterExp, err := c.compileSubscriberQueryTpl(searchStr, queryExp, subStatus, subscriberStatus)
+	filterExp, err := c.compileSubscriberQueryTpl(searchStr, queryExp, subStatus, subscriberStatus, projectID)
 	if err != nil {
 		return err
 	}
@@ -804,4 +813,13 @@ func (c *Core) sendOptinConfirmation(sub models.Subscriber, listIDs []int, publi
 	}
 
 	return c.h.SendOptinConfirmation(sub, listIDs)
+}
+
+// scopeSubQuery limits an arbitrary subscriber query expression to a project
+// (0 = all projects). projectID is a server-side integer, never user input.
+func scopeSubQuery(cond string, projectID int) string {
+	if projectID <= 0 {
+		return cond
+	}
+	return fmt.Sprintf("subscribers.project_id = %d AND (%s)", projectID, cond)
 }

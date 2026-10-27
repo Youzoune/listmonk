@@ -75,12 +75,12 @@ type dashboardView struct {
 
 // ViewDashboard renders the admin dashboard (home) page.
 func (a *App) ViewDashboard(c *echo.Context) error {
-	counts, err := a.core.GetDashboardCounts()
+	counts, err := a.core.GetDashboardCounts(projectID(c))
 	if err != nil {
 		return err
 	}
 
-	charts, err := a.core.GetDashboardCharts()
+	charts, err := a.core.GetDashboardCharts(projectID(c))
 	if err != nil {
 		return err
 	}
@@ -133,7 +133,7 @@ func (a *App) getDashboardCampaigns(c *echo.Context) (models.Campaigns, error) {
 	}
 
 	// Get scheduled campaigns to show on top of the dashboard.
-	camps, _, err := a.core.QueryCampaigns("", []string{models.CampaignStatusScheduled}, nil, "", models.FieldCreatedAt, models.OrderDesc, hasAllPerm, permittedLists, 0, dashboardCampaignCount)
+	camps, _, err := a.core.QueryCampaigns("", []string{models.CampaignStatusScheduled}, nil, "", models.FieldCreatedAt, models.OrderDesc, hasAllPerm, permittedLists, projectID(c), 0, dashboardCampaignCount)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +146,7 @@ func (a *App) getDashboardCampaigns(c *echo.Context) (models.Campaigns, error) {
 			models.CampaignStatusPaused,
 			models.CampaignStatusFinished,
 			models.CampaignStatusCancelled,
-		}, nil, "", models.FieldCreatedAt, models.OrderDesc, hasAllPerm, permittedLists, 0, rem)
+		}, nil, "", models.FieldCreatedAt, models.OrderDesc, hasAllPerm, permittedLists, projectID(c), 0, rem)
 		if err != nil {
 			return nil, err
 		}

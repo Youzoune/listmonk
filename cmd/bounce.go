@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/knadh/listmonk/internal/core"
 	"io"
 	"net/http"
 	"strconv"
@@ -39,7 +40,7 @@ func (a *App) ViewBounces(c *echo.Context) error {
 
 	// Query and fetch bounces from the DB.
 	pg := a.pg.NewFromURL(q)
-	res, total, err := a.core.QueryBounces(campID, 0, q.Get("source"), q.Get("type"), q.Get("order_by"), q.Get("order"), pg.Offset, pg.Limit)
+	res, total, err := a.core.QueryBounces(campID, 0, q.Get("source"), q.Get("type"), q.Get("order_by"), q.Get("order"), projectID(c), pg.Offset, pg.Limit)
 	if err != nil {
 		return err
 	}
@@ -78,7 +79,7 @@ func (a *App) GetBounces(c *echo.Context) error {
 	)
 
 	// Query and fetch bounces from the DB.
-	res, total, err := a.core.QueryBounces(campID, 0, source, typ, orderBy, order, pg.Offset, pg.Limit)
+	res, total, err := a.core.QueryBounces(campID, 0, source, typ, orderBy, order, projectID(c), pg.Offset, pg.Limit)
 	if err != nil {
 		return err
 	}
@@ -110,7 +111,7 @@ func (a *App) GetSubscriberBounces(c *echo.Context) error {
 	}
 
 	// Query and fetch bounces from the DB.
-	out, _, err := a.core.QueryBounces(0, subID, "", "", "", "", 0, 1000)
+	out, _, err := a.core.QueryBounces(0, subID, "", "", "", "", 0, 0, 1000)
 	if err != nil {
 		return err
 	}
@@ -143,7 +144,10 @@ func (a *App) DeleteBounces(c *echo.Context) error {
 	}
 
 	// Delete bounces from the DB.
-	if err := a.core.DeleteBounces(ids, all, campID, c.QueryParam("source"), c.QueryParam("type")); err != nil {
+	if err := a.requireOwned(c, core.EntityBounce, ids...); err != nil {
+		return err
+	}
+	if err := a.core.DeleteBounces(ids, all, campID, c.QueryParam("source"), c.QueryParam("type"), projectID(c)); err != nil {
 		return err
 	}
 
@@ -154,7 +158,7 @@ func (a *App) DeleteBounces(c *echo.Context) error {
 func (a *App) DeleteBounce(c *echo.Context) error {
 	// Delete bounces from the DB.
 	id := getID(c)
-	if err := a.core.DeleteBounces([]int{id}, false, 0, "", ""); err != nil {
+	if err := a.core.DeleteBounces([]int{id}, false, 0, "", "", 0); err != nil {
 		return err
 	}
 
@@ -173,7 +177,10 @@ func (a *App) BlocklistBouncedSubscribers(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, a.i18n.T("globals.messages.invalidID"))
 	}
 
-	if err := a.core.BlocklistBouncedSubscribers(ids, campID, c.QueryParam("source"), c.QueryParam("type")); err != nil {
+	if err := a.requireOwned(c, core.EntityBounce, ids...); err != nil {
+		return err
+	}
+	if err := a.core.BlocklistBouncedSubscribers(ids, campID, c.QueryParam("source"), c.QueryParam("type"), projectID(c)); err != nil {
 		return err
 	}
 
