@@ -1,0 +1,85 @@
+# Relais on Coolify (Docker Compose build pack, "Docker Compose Location":
+# /docker-compose.relais.yml). See deploy/coolify/README.md.
+#
+# Coolify fills the SERVICE_* variables: SERVICE_FQDN_RELAIS_9000 gives the
+# app its domain (edit it in the service's Domains field), SERVICE_USER_* and
+# SERVICE_PASSWORD_* generate credentials that persist between deployments.
+# RELAIS_PROJECTS_DOMAIN is yours to set: projects are served on
+# <identifier>.<RELAIS_PROJECTS_DOMAIN>, like Twenty's workspaces.
+
+services:
+  relais:
+    build:
+      context: .
+      dockerfile: deploy/coolify/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_RELAIS_9000
+      - LISTMONK_app__address=0.0.0.0:9000
+      # The service's Coolify domain; RELAIS_ROOT_URL overrides it if needed.
+      - LISTMONK_app__root_url=${RELAIS_ROOT_URL:-${SERVICE_URL_RELAIS}}
+      - LISTMONK_projects__domain=${RELAIS_PROJECTS_DOMAIN:?Set RELAIS_PROJECTS_DOMAIN, e.g. relais.youzoune.fr}
+      - LISTMONK_db__host=postgres
+      - LISTMONK_db__port=5432
+      - LISTMONK_db__user=${SERVICE_USER_POSTGRES}
+      - LISTMONK_db__password=${SERVICE_PASSWORD_POSTGRES}
+      - LISTMONK_db__database=${POSTGRES_DB:-relais}
+      - LISTMONK_db__ssl_mode=disable
+      - LISTMONK_db__max_open=25
+      - LISTMONK_db__max_idle=25
+      - LISTMONK_db__max_lifetime=300s
+      # Super Admin created on the very first start only.
+      - LISTMONK_ADMIN_USER=${RELAIS_ADMIN_USER:-admin}
+      - LISTMONK_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - TZ=${TZ:-Europe/Paris}
+    volumes:
+      - relais-uploads:/listmonk/uploads
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    labels:
+      # Every project subdomain goes to Relais, which finds the project from
+      # the host. Priority 1: the specific routes of other apps always win.
+      # The wildcard certificate needs a Traefik resolver using the DNS
+      # challenge: letsencrypt-dns on the Youzoune VPS (README).
+      - traefik.enable=true
+      - traefik.http.routers.relais-projects-http.rule=HostRegexp(`^[a-z0-9-]+\.${RELAIS_PROJECTS_DOMAIN}$$`)
+      - traefik.http.routers.relais-projects-http.entryPoints=http
+      - traefik.http.routers.relais-projects-http.middlewares=relais-https-redirect
+      - traefik.http.middlewares.relais-https-redirect.redirectscheme.scheme=https
+      - traefik.http.routers.relais-projects-http.priority=1
+      - traefik.http.routers.relais-projects-http.service=relais-projects
+      - traefik.http.routers.relais-projects-https.rule=HostRegexp(`^[a-z0-9-]+\.${RELAIS_PROJECTS_DOMAIN}$$`)
+      - traefik.http.routers.relais-projects-https.entryPoints=https
+      - traefik.http.routers.relais-projects-https.priority=1
+      - traefik.http.routers.relais-projects-https.tls=true
+      - traefik.http.routers.relais-projects-https.tls.certresolver=${RELAIS_WILDCARD_CERT_RESOLVER:-letsencrypt-dns}
+      - traefik.http.routers.relais-projects-https.tls.domains[0].main=${RELAIS_PROJECTS_DOMAIN}
+      - traefik.http.routers.relais-projects-https.tls.domains[0].sans=*.${RELAIS_PROJECTS_DOMAIN}
+      - traefik.http.routers.relais-projects-https.service=relais-projects
+      - traefik.http.services.relais-projects.loadbalancer.server.port=9000
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-relais}
+    volumes:
+      - relais-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  relais-uploads:
+  relais-postgres:
