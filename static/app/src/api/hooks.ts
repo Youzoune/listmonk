@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api, query } from './client';
 import type {
   Campaign, CampaignStatus, DashboardCharts, DashboardCounts, List, NewCampaign, Page, Profile, Project,
-  AnalyticsCount, AnalyticsLink, Bounce, Media, Role, UserFull, UserInput, ImportParams, ImportStatus, ListInput, ProjectInput, Relay, RelayInput, ServerConfig, Settings, SmtpServer, Subscriber, SubscriberInput, Template, TemplateInput, User,
+  AnalyticsCount, AnalyticsLink, Bounce, ListRole, Media, Role, UserFull, UserInput, ImportParams, ImportStatus, ListInput, ProjectInput, Relay, RelayInput, ServerConfig, Settings, SmtpServer, Subscriber, SubscriberInput, Template, TemplateInput, User,
 } from './types';
 
 // Query keys start with the project so that switching project refetches everything.
@@ -47,9 +47,10 @@ export function useLists(project: number | null) {
   });
 }
 
-export function useSubscribers(project: number | null, opts: { search?: string; status?: string; listId?: number; page?: number; perPage?: number }) {
+export function useSubscribers(project: number | null, opts: { search?: string; sql?: string; status?: string; listId?: number; page?: number; perPage?: number }) {
   const q = query({
     search: opts.search,
+    query: opts.sql,
     status: opts.status,
     list_id: opts.listId,
     page: opts.page ?? 1,
@@ -360,7 +361,7 @@ export function useUsersFull(enabled: boolean) {
 
 export function useRoles(enabled: boolean) {
   const users = useQuery({ queryKey: ['roles', 'users'], queryFn: () => api<Role[]>('/api/roles/users'), enabled });
-  const lists = useQuery({ queryKey: ['roles', 'lists'], queryFn: () => api<Role[]>('/api/roles/lists'), enabled });
+  const lists = useQuery({ queryKey: ['roles', 'lists'], queryFn: () => api<ListRole[]>('/api/roles/lists'), enabled });
   return { users, lists };
 }
 
@@ -391,6 +392,15 @@ export function useSaveRole() {
   });
 }
 
+export function useSaveListRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, role }: { id?: number; role: { name: string; lists: { id: number; permissions: string[] }[] } }) =>
+      id ? api<ListRole>(`/api/roles/lists/${id}`, { method: 'PUT', json: role }) : api<ListRole>('/api/roles/lists', { method: 'POST', json: role }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['roles'] }); qc.invalidateQueries({ queryKey: ['users-full'] }); },
+  });
+}
+
 export function useDeleteRole() {
   const qc = useQueryClient();
   return useMutation({
@@ -399,8 +409,8 @@ export function useDeleteRole() {
   });
 }
 
-export function useMedia(project: number | null) {
-  return useQuery({ queryKey: key(project, 'media'), queryFn: () => api<Page<Media>>('/api/media?per_page=all') });
+export function useMedia(project: number | null, enabled = true) {
+  return useQuery({ queryKey: key(project, 'media'), queryFn: () => api<Page<Media>>('/api/media?per_page=all'), enabled });
 }
 
 export function useUploadMedia(project: number | null) {

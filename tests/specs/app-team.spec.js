@@ -13,7 +13,7 @@ test.describe('Relais team, media and bounces', () => {
 
   test('creates a role with plain-word permissions', async ({ page }) => {
     await page.goto('/app/equipe?onglet=roles');
-    await page.getByRole('button', { name: 'Nouveau rôle' }).click();
+    await page.getByRole('button', { name: 'Nouveau rôle', exact: true }).click();
     await page.getByLabel('Nom du rôle').fill('Rédaction');
     await page.getByLabel('Voir toutes les campagnes').check();
     await page.getByLabel('Gérer toutes les campagnes').check();
@@ -68,5 +68,31 @@ test.describe('Relais team, media and bounces', () => {
     await row.getByRole('checkbox').check();
     await page.getByRole('button', { name: 'Mettre les contacts en liste noire' }).click();
     await expect.poll(async () => (await (await page.request.get('/api/subscribers/2')).json()).data.status).toBe('blocklisted');
+  });
+
+  test('creates a list role and gives it to a user', async ({ page }) => {
+    await page.goto('/app/equipe?onglet=roles');
+    await page.getByRole('button', { name: 'Nouveau rôle sur les listes' }).click();
+    const form = page.getByRole('region', { name: 'Nouveau rôle sur les listes' });
+    await form.getByLabel('Nom du rôle').fill('Section jeunes');
+    await form.getByLabel('Default list').selectOption('manage');
+    await form.getByLabel('Opt-in list').selectOption('get');
+    await form.getByRole('button', { name: 'Créer le rôle' }).click();
+    const row = page.locator('tr').filter({ hasText: 'Section jeunes' });
+    await expect(row).toContainText('Default list (gérer)');
+    await expect(row).toContainText('Opt-in list');
+
+    const roles = (await (await page.request.get('/api/roles/lists')).json()).data;
+    const role = roles.find((r) => r.name === 'Section jeunes');
+    expect(role.lists.find((l) => l.name === 'Default list').permissions.sort()).toEqual(['list:get', 'list:manage']);
+
+    // Back to read-only on one list, then delete.
+    await row.getByRole('button', { name: 'Modifier' }).click();
+    await page.getByRole('region', { name: 'Rôle sur les listes Section jeunes' }).getByLabel('Default list').selectOption('none');
+    await page.getByRole('region', { name: 'Rôle sur les listes Section jeunes' }).getByRole('button', { name: 'Enregistrer' }).click();
+    await expect(row).not.toContainText('Default list');
+    await row.getByRole('button', { name: 'Supprimer' }).click();
+    await row.getByRole('button', { name: 'Confirmer' }).click();
+    await expect(row).toHaveCount(0);
   });
 });

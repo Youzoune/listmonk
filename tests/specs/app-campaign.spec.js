@@ -33,6 +33,29 @@ test.describe('Relais campaign page', () => {
     expect(saved.body).toBe('<p>Bonjour {{ .Subscriber.FirstName }},</p>\n<p>Nouvelle édition.</p>');
   });
 
+  test('formats the text with the toolbar', async ({ page }) => {
+    await page.goto(`/app/campagnes/${id}`);
+    const body = page.getByLabel('Message', { exact: true });
+    await body.fill('Bonjour,\n\nLa saison reprend');
+    // Select "saison" and make it bold.
+    await body.evaluate((el) => { const i = el.value.indexOf('saison'); el.setSelectionRange(i, i + 6); });
+    await page.getByRole('button', { name: 'Gras' }).click();
+    await expect(body).toHaveValue('Bonjour,\n\nLa **saison** reprend');
+    await expect(body).toBeFocused();
+    await body.evaluate((el) => el.setSelectionRange(el.value.length, el.value.length));
+    await page.getByRole('button', { name: 'Lien' }).click();
+    await page.keyboard.type('https://club.fr');
+    await expect(body).toHaveValue(/\[texte du lien\]\(https:\/\/club\.fr\)/);
+    await expect(page.frameLocator('.tpl-preview iframe').locator('strong')).toHaveText('saison', { timeout: 10000 });
+    await page.getByRole('button', { name: 'Enregistrer' }).click();
+    await expect.poll(async () => (await (await page.request.get(`/api/campaigns/${id}`)).json()).data.body)
+      .toContain('<strong>saison</strong>');
+
+    // Reopened, it is still text.
+    await page.reload();
+    await expect(page.getByLabel('Message', { exact: true })).toHaveValue(/La \*\*saison\*\* reprend/);
+  });
+
   test('sends a test to a contact of the project', async ({ page }) => {
     await clearMail();
     await page.goto(`/app/campagnes/${id}`);

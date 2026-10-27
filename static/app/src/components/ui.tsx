@@ -131,7 +131,7 @@ export function ProjectBadge({ id, name, size = 28 }: { id: number; name: string
   );
 }
 
-export function Field({ id, label, hint, children }: { id: string; label: string; hint?: string; children: ReactNode }) {
+export function Field({ id, label, hint, children }: { id: string; label: string; hint?: ReactNode; children: ReactNode }) {
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { apiHTML } from '../api/client';
 import {
@@ -8,6 +8,7 @@ import {
 import type { AnalyticsCount, Campaign } from '../api/types';
 import { CampaignChip, ErrorState, Explain, Field, Icon, Loading, Progress } from '../components/ui';
 import { campaignHTMLToText, textToCampaignHTML } from '../lib/body';
+import { FormatBar, FormatHelp } from '../components/FormatBar';
 import { ACTIONS, ACTION_LABEL, ACTION_STATUS, analyticsRange, isEditable, rate, type CampaignAction } from '../lib/campaigns';
 import { count, dateTime, num, relayLabel } from '../lib/format';
 import { fromTemplate, toTemplate } from '../lib/variables';
@@ -86,6 +87,7 @@ export function CampaignDetail() {
   const analytics = useCampaignAnalytics(project.id, can('campaigns:get_analytics') ? cid : null, range);
 
   const [draft, setDraft] = useState<{ name: string; subject: string; from: string; lists: number[]; templateId: number | null; text: string | null; html: string; archive: boolean } | null>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
   const [sendAt, setSendAt] = useState(nextHour);
   const [scheduling, setScheduling] = useState(false);
   const [testTo, setTestTo] = useState('');
@@ -231,9 +233,13 @@ export function CampaignDetail() {
               </select>
             </Field>
             {draft.text !== null ? (
-              <Field id="c-body" label="Message" hint="Une ligne vide sépare deux paragraphes.">
-                <textarea id="c-body" rows={14} value={draft.text} onChange={(e) => setDraft({ ...draft, text: e.target.value })} />
-              </Field>
+              <>
+                <FormatBar target={bodyRef} value={draft.text} onChange={(v) => setDraft({ ...draft, text: v })} />
+                <Field id="c-body" label="Message" hint="Une ligne vide sépare deux paragraphes.">
+                  <textarea id="c-body" ref={bodyRef} rows={14} value={draft.text} onChange={(e) => setDraft({ ...draft, text: e.target.value })} />
+                </Field>
+                <FormatHelp />
+              </>
             ) : (
               <Field id="c-html" label="Message (HTML)" hint="Ce message contient de la mise en forme : il se modifie en HTML.">
                 <textarea id="c-html" className="mono code-area" rows={16} spellCheck={false} value={draft.html} onChange={(e) => setDraft({ ...draft, html: e.target.value })} />

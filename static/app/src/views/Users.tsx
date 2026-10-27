@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { useDeleteRole, useDeleteUser, useRoles, useSaveRole, useSaveUser, useServerConfig, useUsersFull } from '../api/hooks';
-import type { Role, UserFull, UserInput } from '../api/types';
+import { useDeleteRole, useDeleteUser, useLists, useRoles, useSaveListRole, useSaveRole, useSaveUser, useServerConfig, useUsersFull } from '../api/hooks';
+import type { ListRole, Role, UserFull, UserInput } from '../api/types';
 import { Chip, ErrorState, Explain, Field, Icon, Loading } from '../components/ui';
 import { dateTime } from '../lib/format';
-import { groupLabel, permissionLabel, type PermissionGroup } from '../lib/permissions';
+import { groupLabel, listAccess, permissionLabel, setListAccess, type ListAccess, type ListGrant, type PermissionGroup } from '../lib/permissions';
 import { useProject } from '../project';
 
 const USERNAME_RE = /^[a-zA-Z0-9_\-.@]+$/;
 
-function UserForm({ user, roles, listRoles, onDone }: { user?: UserFull; roles: Role[]; listRoles: Role[]; onDone: () => void }) {
+function UserForm({ user, roles, listRoles, onDone }: { user?: UserFull; roles: Role[]; listRoles: ListRole[]; onDone: () => void }) {
   const save = useSaveUser();
   const [form, setForm] = useState<UserInput>(user ? {
     username: user.username, name: user.name, email: user.email ?? '', type: user.type, status: user.status,
@@ -148,6 +148,56 @@ function RoleForm({ role, groups, onDone }: { role?: Role; groups: PermissionGro
   );
 }
 
+function ListRoleForm({ role, onDone }: { role?: ListRole; onDone: () => void }) {
+  const { project } = useProject();
+  const lists = useLists(project.id);
+  const save = useSaveListRole();
+  const [name, setName] = useState(role?.name ?? '');
+  const [grants, setGrants] = useState<ListGrant[]>(role?.lists ?? []);
+  const own = lists.data?.results ?? [];
+  const others = grants.filter((g) => !own.some((l) => l.id === g.id)).length;
+
+  return (
+    <section className="panel list-form" aria-label={role ? `Rôle sur les listes ${role.name}` : 'Nouveau rôle sur les listes'}>
+      <h2>{role ? `Rôle sur les listes « ${role.name} »` : 'Nouveau rôle sur les listes'}</h2>
+      <Field id="lr-name" label="Nom du rôle">
+        <input id="lr-name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
+      </Field>
+      <p className="small muted">Listes du projet {project.name}{others > 0 ? ` (et ${others} liste${others > 1 ? 's' : ''} d’autres projets, conservée${others > 1 ? 's' : ''})` : ''}.</p>
+      {lists.isPending ? <Loading /> : lists.isError ? <ErrorState error={lists.error} /> : (
+        <div className="table-wrap">
+          <table className="table">
+            <thead><tr><th>Liste</th><th>Accès</th></tr></thead>
+            <tbody>
+              {own.map((l) => (
+                <tr key={l.id}>
+                  <td><label htmlFor={`lr-${l.id}`} className="strong">{l.name}</label></td>
+                  <td>
+                    <select id={`lr-${l.id}`} value={listAccess(grants, l.id)} onChange={(e) => setGrants(setListAccess(grants, l, e.target.value as ListAccess))}>
+                      <option value="none">Aucun accès</option>
+                      <option value="get">Voir la liste et ses contacts</option>
+                      <option value="manage">Voir et gérer</option>
+                    </select>
+                  </td>
+                </tr>
+              ))}
+              {own.length === 0 && <tr><td colSpan={2} className="empty">Ce projet n’a pas encore de liste.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {save.isError && <ErrorState error={save.error} />}
+      <div className="row-gap end">
+        <button type="button" className="btn btn-ghost" onClick={onDone}>Annuler</button>
+        <button type="button" className="btn btn-dark" disabled={save.isPending || !name.trim()}
+          onClick={() => save.mutate({ id: role?.id, role: { name: name.trim(), lists: grants.map((g) => ({ id: g.id, permissions: g.permissions })) } }, { onSuccess: onDone })}>
+          {save.isPending ? 'Enregistrement…' : role ? 'Enregistrer' : 'Créer le rôle'}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export function Users() {
   const { project, profile, can } = useProject();
   const [params, setParams] = useSearchParams();
@@ -159,6 +209,7 @@ export function Users() {
   const delRole = useDeleteRole();
   const [editing, setEditing] = useState<UserFull | 'new' | null>(null);
   const [editingRole, setEditingRole] = useState<Role | 'new' | null>(null);
+  const [editingListRole, setEditingListRole] = useState<ListRole | 'new' | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
   const groups = (config.data?.permissions ?? []) as unknown as PermissionGroup[];
   const canManage = can('users:manage');
@@ -230,8 +281,8 @@ export function Users() {
           <Explain title="Rôles et rôles sur les listes">
             <p>
               Un <span className="strong">rôle</span> dit ce qu’un utilisateur peut faire (voir les contacts, lancer des campagnes, modifier les réglages…).
-              Un <span className="strong">rôle sur les listes</span>, facultatif, le limite en plus à certaines listes ; il se règle pour l’instant dans
-              l’<a className="link" href="/admin/users/roles/lists">ancienne interface</a>.
+              Un <span className="strong">rôle sur les listes</span>, facultatif, le limite en plus à certaines listes : par exemple
+              un bénévole qui ne voit que la liste de sa section. On l’attribue ensuite dans la fiche de l’utilisateur.
             </p>
           </Explain>
           {editingRole && <RoleForm key={editingRole === 'new' ? 'new' : editingRole.id} role={editingRole === 'new' ? undefined : editingRole} groups={groups} onDone={() => setEditingRole(null)} />}
@@ -256,6 +307,37 @@ export function Users() {
                       </td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="panel-head">
+            <h2>Rôles sur les listes</h2>
+            {can('roles:manage') && <button type="button" className="btn btn-sm" onClick={() => setEditingListRole('new')}><Icon name="plus" size={14} /> Nouveau rôle sur les listes</button>}
+          </div>
+          {editingListRole && <ListRoleForm key={editingListRole === 'new' ? 'new' : editingListRole.id} role={editingListRole === 'new' ? undefined : editingListRole} onDone={() => setEditingListRole(null)} />}
+          {roles.lists.isPending ? <Loading /> : roles.lists.isError ? <ErrorState error={roles.lists.error} /> : (
+            <div className="table-wrap">
+              <table className="table">
+                <thead><tr><th>Rôle sur les listes</th><th>Listes</th><th className="right">Actions</th></tr></thead>
+                <tbody>
+                  {roles.lists.data.map((r) => (
+                    <tr key={r.id}>
+                      <td className="strong">{r.name}</td>
+                      <td className="small">{!r.lists?.length ? <span className="muted">Aucune liste</span> : r.lists.map((l) => `${l.name}${l.permissions.includes('list:manage') ? ' (gérer)' : ''}`).join(', ')}</td>
+                      <td className="right">
+                        {can('roles:manage') && (
+                          <div className="row-gap end">
+                            <button type="button" className="btn btn-sm" onClick={() => setEditingListRole(r)}>Modifier</button>
+                            {confirm === `l${r.id}` ? (
+                              <button type="button" className="btn btn-sm btn-danger" onClick={() => delRole.mutate(r.id, { onSettled: () => setConfirm(null) })}>Confirmer</button>
+                            ) : <button type="button" className="btn btn-sm btn-ghost" onClick={() => setConfirm(`l${r.id}`)}>Supprimer</button>}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {roles.lists.data.length === 0 && <tr><td colSpan={3} className="empty">Aucun rôle sur les listes : chacun voit toutes les listes que son rôle permet.</td></tr>}
                 </tbody>
               </table>
             </div>

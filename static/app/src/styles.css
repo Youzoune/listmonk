@@ -147,6 +147,7 @@ a.btn-dark { color: var(--bg); }
 .back { margin-bottom: 8px; text-decoration: none; color: var(--muted); }
 .row-gap { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .row-gap.end { justify-content: flex-end; margin-top: 8px; }
+.row-gap.between { justify-content: space-between; }
 
 .view { display: flex; flex-direction: column; gap: 20px; max-width: 1240px; }
 .view-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; }
@@ -518,3 +519,15 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 .field-num .input-unit { min-height: 44px; }
 .boot { padding: 48px 24px; color: var(--muted); text-align: center; }
 .self-start { align-self: flex-start; }
+.oidc-rule { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)) auto; gap: 10px; align-items: end; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-sm); }
+.panel.nested { background: var(--bg); padding: 16px; gap: 12px; }
+
+/* Formatting toolbar of the campaign text */
+.format-bar-wrap { display: flex; flex-direction: column; gap: 8px; }
+.format-bar { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--bg); }
+.format-bar .italic { font-style: italic; }
+.media-picker { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: var(--r-sm); }
+.media-pick { width: 72px; height: 72px; padding: 0; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); overflow: hidden; cursor: pointer; }
+.media-pick:hover, .media-pick:focus-visible { border-color: var(--fg); }
+.media-pick img { width: 100%; height: 100%; object-fit: cover; }
+.sql-search { gap: 8px; }

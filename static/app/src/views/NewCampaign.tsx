@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import { useCreateCampaign, useLists, useRelays, useServerConfig } from '../api/hooks';
 import { ErrorState, Field, Icon, Loading } from '../components/ui';
 import { textToCampaignHTML } from '../lib/body';
+import { FormatBar, FormatHelp } from '../components/FormatBar';
 import { num, senderName } from '../lib/format';
 import { cadenceSummary, hasCadence, relayName, toCadence } from '../lib/relays';
 import { estimateEnd } from '../lib/sending';
@@ -175,10 +176,12 @@ export function NewCampaign() {
                   <button key={v.token} type="button" className="var-chip" onMouseDown={(e) => e.preventDefault()} onClick={() => insert(v.token)}>{v.label}</button>
                 ))}
               </div>
+              <FormatBar target={bodyRef} value={body} onChange={(v) => { setBody(v); bodyTouched.current = true; }} />
               <Field id="body" label="Texte" hint="Une ligne vide sépare deux paragraphes. Le lien de désinscription est ajouté automatiquement en bas de l’e-mail.">
                 <textarea id="body" ref={bodyRef} rows={11} value={body} onFocus={() => { target.current = 'body'; bodyTouched.current = true; }}
                   onChange={(e) => setBody(e.target.value)} />
               </Field>
+              <FormatHelp />
               <p className="small muted">Organisation et Ville viennent des attributs <span className="mono">organisation</span> et <span className="mono">ville</span> des contacts ; vides s’ils ne sont pas renseignés.</p>
             </>
           )}

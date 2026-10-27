@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { useSaveSettings, useServerConfig, useSettings, useTestSmtp } from '../api/hooks';
-import type { Settings as SettingsData, SmtpServer } from '../api/types';
+import { useRoles, useSaveSettings, useServerConfig, useSettings, useTestSmtp } from '../api/hooks';
+import type { BounceBox, Messenger, Settings as SettingsData, SmtpServer } from '../api/types';
 import { Chip, ErrorState, Explain, Field, Icon, Loading } from '../components/ui';
 import { relayLabel } from '../lib/format';
 import { forEditing, settingsForSave } from '../lib/settings';
@@ -16,6 +16,7 @@ const TABS = [
   { id: 'securite', label: 'Sécurité' },
   { id: 'rebonds', label: 'Rebonds' },
   { id: 'medias', label: 'Stockage des médias' },
+  { id: 'messagers', label: 'Autres canaux' },
 ] as const;
 type Tab = typeof TABS[number]['id'];
 
@@ -378,8 +379,94 @@ function Security({ s, set, canEdit }: { s: SettingsData; set: Patch; canEdit: b
           </Field>
         </div>
       )}
-      <p className="small muted">La connexion par un fournisseur d’identité (OIDC) se règle dans l’<a className="link" href="/admin/settings">ancienne interface</a>.</p>
+      <Oidc s={s} set={set} canEdit={canEdit} />
     </section>
+  );
+}
+
+const NO_OIDC: SettingsData['security.oidc'] = {
+  enabled: false, logout: false, verify_email: true, provider_url: '', provider_name: '', client_id: '', client_secret: '',
+  auto_create_users: false, default_user_role_id: null, default_list_role_id: null, roles: [],
+};
+
+// Single sign-on through Google Workspace, Microsoft, Keycloak, Authentik…
+function Oidc({ s, set, canEdit }: { s: SettingsData; set: Patch; canEdit: boolean }) {
+  const { can } = useProject();
+  const roles = useRoles(can('roles:get'));
+  const o = { ...NO_OIDC, ...s['security.oidc'] };
+  const setO = (patch: Partial<typeof o>) => set({ 'security.oidc': { ...o, ...patch } });
+  const callback = `${(s['app.root_url'] ?? '').replace(/\/$/, '')}/auth/oidc`;
+  const mappings = o.roles ?? [];
+  const setMapping = (i: number, patch: Partial<(typeof mappings)[number]>) => setO({ roles: mappings.map((m, j) => (j === i ? { ...m, ...patch } : m)) });
+  const roleSelect = (id: string, label: string, value: number | null | undefined, list: { id: number; name: string }[], onChange: (v: number | null) => void, none: string) => (
+    <Field id={id} label={label}>
+      <select id={id} value={value ?? ''} disabled={!canEdit} onChange={(e) => onChange(Number(e.target.value) || null)}>
+        <option value="">{none}</option>
+        {list.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+      </select>
+    </Field>
+  );
+
+  return (
+    <>
+      <h3>Connexion avec un compte d’entreprise (OIDC)</h3>
+      <Toggle id="oidc-on" label="Proposer « Se connecter avec… » sur la page de connexion" checked={o.enabled} disabled={!canEdit} onChange={(v) => setO({ enabled: v })}
+        hint="Google Workspace, Microsoft Entra, Keycloak, Authentik… L’équipe se connecte avec son compte habituel." />
+      {o.enabled && (
+        <>
+          <Explain title="Où trouver ces informations">
+            <p>Dans la console du fournisseur, créez une application « Web » (OAuth 2 / OpenID Connect) et donnez-lui cette adresse de retour :</p>
+            <p><code className="mono">{callback}</code></p>
+            <p>Le fournisseur affiche ensuite un identifiant client et un secret. L’adresse du fournisseur est par exemple
+              https://accounts.google.com ou https://login.microsoftonline.com/&lt;tenant&gt;/v2.0.</p>
+          </Explain>
+          <div className="grid-2">
+            <Field id="oidc-name" label="Nom affiché" hint="Sur le bouton de connexion, par exemple Google.">
+              <input id="oidc-name" type="text" value={o.provider_name} disabled={!canEdit} onChange={(e) => setO({ provider_name: e.target.value })} />
+            </Field>
+            <Field id="oidc-url" label="Adresse du fournisseur">
+              <input id="oidc-url" type="url" className="mono" value={o.provider_url} disabled={!canEdit} onChange={(e) => setO({ provider_url: e.target.value })} />
+            </Field>
+            <Field id="oidc-client" label="Identifiant client">
+              <input id="oidc-client" type="text" className="mono" value={o.client_id} disabled={!canEdit} onChange={(e) => setO({ client_id: e.target.value })} />
+            </Field>
+            <Field id="oidc-secret" label="Secret client" hint="Laissez vide pour garder le secret enregistré.">
+              <input id="oidc-secret" type="password" autoComplete="new-password" placeholder="Enregistré" value={o.client_secret} disabled={!canEdit}
+                onChange={(e) => setO({ client_secret: e.target.value })} />
+            </Field>
+          </div>
+          <Toggle id="oidc-verify" label="Exiger une adresse e-mail vérifiée" checked={o.verify_email} disabled={!canEdit} onChange={(v) => setO({ verify_email: v })} />
+          <Toggle id="oidc-logout" label="Se déconnecter aussi du fournisseur" checked={o.logout} disabled={!canEdit} onChange={(v) => setO({ logout: v })}
+            hint="Quitter Relais ferme aussi la session chez le fournisseur." />
+          <Toggle id="oidc-create" label="Créer le compte à la première connexion" checked={o.auto_create_users} disabled={!canEdit} onChange={(v) => setO({ auto_create_users: v })}
+            hint="Sinon, seuls les utilisateurs déjà créés dans Équipe (même adresse e-mail) peuvent se connecter." />
+          {o.auto_create_users && (
+            <>
+              <div className="grid-2">
+                {roleSelect('oidc-role', 'Rôle des nouveaux comptes', o.default_user_role_id, roles.users.data ?? [], (v) => setO({ default_user_role_id: v }), 'Choisir…')}
+                {roleSelect('oidc-list-role', 'Rôle sur les listes (facultatif)', o.default_list_role_id, roles.lists.data ?? [], (v) => setO({ default_list_role_id: v }), 'Aucun')}
+              </div>
+              <h4>Rôle selon un attribut du compte (facultatif)</h4>
+              <p className="small muted">Par exemple l’attribut « groups » égal à « marketing » donne le rôle Éditeur. La première règle qui correspond l’emporte.</p>
+              {mappings.map((m, i) => (
+                <div key={i} className="oidc-rule">
+                  <Field id={`oidc-claim-${i}`} label="Attribut">
+                    <input id={`oidc-claim-${i}`} type="text" className="mono" value={m.claim} disabled={!canEdit} onChange={(e) => setMapping(i, { claim: e.target.value })} />
+                  </Field>
+                  <Field id={`oidc-match-${i}`} label="Valeur exacte">
+                    <input id={`oidc-match-${i}`} type="text" value={m.match} disabled={!canEdit} onChange={(e) => setMapping(i, { match: e.target.value })} />
+                  </Field>
+                  {roleSelect(`oidc-r-${i}`, 'Rôle', m.user_role_id, roles.users.data ?? [], (v) => setMapping(i, { user_role_id: v ?? undefined }), 'Rôle par défaut')}
+                  {roleSelect(`oidc-lr-${i}`, 'Rôle sur les listes', m.list_role_id, roles.lists.data ?? [], (v) => setMapping(i, { list_role_id: v ?? undefined }), 'Aucun')}
+                  {canEdit && <button type="button" className="btn btn-sm btn-ghost" aria-label={`Retirer la règle ${i + 1}`} onClick={() => setO({ roles: mappings.filter((_, j) => j !== i) })}><Icon name="x" size={14} /></button>}
+                </div>
+              ))}
+              {canEdit && <button type="button" className="btn btn-sm self-start" onClick={() => setO({ roles: [...mappings, { claim: 'groups', match: '' }] })}><Icon name="plus" size={14} /> Ajouter une règle</button>}
+            </>
+          )}
+        </>
+      )}
+    </>
   );
 }
 
@@ -398,7 +485,7 @@ function BounceRules({ s, set, canEdit }: { s: SettingsData; set: Patch; canEdit
         hint="Relais compte les e-mails refusés et applique les règles ci-dessous." />
       <Toggle id="bounce-webhooks" label="Recevoir les rebonds par webhook" checked={!!s['bounce.webhooks_enabled']} disabled={!canEdit}
         onChange={(v) => set({ 'bounce.webhooks_enabled': v })}
-        hint="Pour les prestataires (Amazon SES, Brevo, Postmark…) qui signalent les rebonds. Leur configuration se fait dans l’ancienne interface." />
+        hint="Pour les prestataires (Amazon SES, SendGrid, Postmark…) qui signalent eux-mêmes les rebonds : voir plus bas." />
       <h3>Que faire après plusieurs rebonds</h3>
       {BOUNCE_TYPES.map((t) => (
         <div key={t.id} className="grid-2 bounce-rule">
@@ -415,7 +502,158 @@ function BounceRules({ s, set, canEdit }: { s: SettingsData; set: Patch; canEdit
           </Field>
         </div>
       ))}
-      <p className="small muted">Les boîtes de réception qui collectent les rebonds (POP3) se règlent dans l’<a className="link" href="/admin/settings">ancienne interface</a>.</p>
+      <BounceMailboxes s={s} set={set} canEdit={canEdit} />
+      {s['bounce.webhooks_enabled'] && <BounceWebhooks s={s} set={set} canEdit={canEdit} />}
+    </section>
+  );
+}
+
+const NEW_BOX: BounceBox = {
+  enabled: true, type: 'pop', host: '', port: 995, auth_protocol: 'userpass', return_path: '', username: '', password: '',
+  tls_enabled: true, tls_skip_verify: false, scan_interval: '15m',
+};
+
+// A POP3 mailbox where bounced e-mails land (the Return-Path address).
+function BounceMailboxes({ s, set, canEdit }: { s: SettingsData; set: Patch; canEdit: boolean }) {
+  const boxes = s['bounce.mailboxes'] ?? [];
+  const setBox = (i: number, patch: Partial<BounceBox>) => set({ 'bounce.mailboxes': boxes.map((b, j) => (j === i ? { ...b, ...patch } : b)) });
+  return (
+    <>
+      <h3>Boîte de réception des rebonds</h3>
+      <Explain title="À quoi sert cette boîte">
+        <p>
+          Quand une adresse n’existe pas, le serveur du destinataire renvoie un message d’erreur à l’adresse de retour (Return-Path).
+          En donnant à Relais l’accès à cette boîte (POP3), il lit ces messages tous les quarts d’heure et compte les rebonds.
+          Créez une adresse dédiée, par exemple rebonds@votre-domaine.fr, chez votre hébergeur.
+        </p>
+      </Explain>
+      {boxes.map((b, i) => (
+        <div key={b.uuid ?? i} className="panel nested" aria-label={`Boîte de rebonds ${i + 1}`} role="group">
+          <Toggle id={`bb-on-${i}`} label="Lire cette boîte" checked={b.enabled} disabled={!canEdit} onChange={(v) => setBox(i, { enabled: v })} />
+          <div className="grid-2">
+            <Field id={`bb-rp-${i}`} label="Adresse de retour (Return-Path)" hint="Ajoutée aux e-mails envoyés : les rebonds y arrivent.">
+              <input id={`bb-rp-${i}`} type="email" value={b.return_path} disabled={!canEdit} onChange={(e) => setBox(i, { return_path: e.target.value })} />
+            </Field>
+            <Field id={`bb-int-${i}`} label="Lire toutes les" hint="Par exemple 15m (15 minutes) ou 1h. Une minute au moins.">
+              <input id={`bb-int-${i}`} type="text" value={b.scan_interval} disabled={!canEdit} onChange={(e) => setBox(i, { scan_interval: e.target.value })} />
+            </Field>
+            <Field id={`bb-host-${i}`} label="Serveur POP3" hint="Par exemple pop3.mail.ovh.net.">
+              <input id={`bb-host-${i}`} type="text" className="mono" value={b.host} disabled={!canEdit} onChange={(e) => setBox(i, { host: e.target.value })} />
+            </Field>
+            <Num id={`bb-port-${i}`} label="Port" value={b.port} min={1} disabled={!canEdit} onChange={(v) => setBox(i, { port: v })} hint="995 avec TLS, 110 sans." />
+            <Field id={`bb-user-${i}`} label="Identifiant de la boîte">
+              <input id={`bb-user-${i}`} type="text" value={b.username} disabled={!canEdit} onChange={(e) => setBox(i, { username: e.target.value })} />
+            </Field>
+            <Field id={`bb-pwd-${i}`} label="Mot de passe de la boîte" hint="Laissez vide pour garder le mot de passe enregistré.">
+              <input id={`bb-pwd-${i}`} type="password" autoComplete="new-password" placeholder="Enregistré" value={b.password} disabled={!canEdit}
+                onChange={(e) => setBox(i, { password: e.target.value })} />
+            </Field>
+          </div>
+          <Toggle id={`bb-tls-${i}`} label="Connexion chiffrée (TLS)" checked={b.tls_enabled} disabled={!canEdit} onChange={(v) => setBox(i, { tls_enabled: v })} />
+          {canEdit && boxes.length > 1 && (
+            <button type="button" className="btn btn-sm btn-ghost self-start" onClick={() => set({ 'bounce.mailboxes': boxes.filter((_, j) => j !== i) })}>Retirer cette boîte</button>
+          )}
+        </div>
+      ))}
+      {canEdit && boxes.length === 0 && (
+        <button type="button" className="btn btn-sm self-start" onClick={() => set({ 'bounce.mailboxes': [NEW_BOX] })}><Icon name="plus" size={14} /> Ajouter une boîte</button>
+      )}
+    </>
+  );
+}
+
+// Providers that report bounces themselves, each on its own address.
+function BounceWebhooks({ s, set, canEdit }: { s: SettingsData; set: Patch; canEdit: boolean }) {
+  const root = (s['app.root_url'] ?? '').replace(/\/$/, '');
+  const url = (service: string) => <code className="mono small">{`${root}/webhooks/service/${service}`}</code>;
+  const secret = (id: string, label: string, value: string, onChange: (v: string) => void) => (
+    <Field id={id} label={label} hint="Laissez vide pour garder la valeur enregistrée.">
+      <input id={id} type="password" autoComplete="new-password" placeholder="Enregistré" value={value} disabled={!canEdit} onChange={(e) => onChange(e.target.value)} />
+    </Field>
+  );
+  const pm = s['bounce.postmark'] ?? { enabled: false, username: '', password: '' };
+  const fe = s['bounce.forwardemail'] ?? { enabled: false, key: '' };
+  const lm = s['bounce.lettermint'] ?? { enabled: false, key: '' };
+  const az = s['bounce.azure'] ?? { enabled: false, shared_secret: '', shared_secret_header: '' };
+  return (
+    <>
+      <h3>Rebonds signalés par le prestataire d’envoi</h3>
+      <p className="small muted">Activez votre prestataire et collez l’adresse indiquée dans sa console (rubrique webhooks ou notifications).</p>
+      <Toggle id="wh-ses" label="Amazon SES" checked={!!s['bounce.ses_enabled']} disabled={!canEdit} onChange={(v) => set({ 'bounce.ses_enabled': v })}
+        hint={<>Notifications SNS vers {url('ses')}</>} />
+      <Toggle id="wh-sendgrid" label="SendGrid" checked={!!s['bounce.sendgrid_enabled']} disabled={!canEdit} onChange={(v) => set({ 'bounce.sendgrid_enabled': v })}
+        hint={<>Event Webhook vers {url('sendgrid')}</>} />
+      {s['bounce.sendgrid_enabled'] && secret('wh-sendgrid-key', 'Clé de vérification SendGrid', s['bounce.sendgrid_key'] ?? '', (v) => set({ 'bounce.sendgrid_key': v }))}
+      <Toggle id="wh-postmark" label="Postmark" checked={pm.enabled} disabled={!canEdit} onChange={(v) => set({ 'bounce.postmark': { ...pm, enabled: v } })}
+        hint={<>Webhook de rebonds vers {url('postmark')}, avec identifiant et mot de passe.</>} />
+      {pm.enabled && (
+        <div className="grid-2">
+          <Field id="wh-postmark-user" label="Identifiant Postmark">
+            <input id="wh-postmark-user" type="text" value={pm.username} disabled={!canEdit} onChange={(e) => set({ 'bounce.postmark': { ...pm, username: e.target.value } })} />
+          </Field>
+          {secret('wh-postmark-pwd', 'Mot de passe Postmark', pm.password, (v) => set({ 'bounce.postmark': { ...pm, password: v } }))}
+        </div>
+      )}
+      <Toggle id="wh-fe" label="Forward Email" checked={fe.enabled} disabled={!canEdit} onChange={(v) => set({ 'bounce.forwardemail': { ...fe, enabled: v } })}
+        hint={<>Webhook vers {url('forwardemail')}</>} />
+      {fe.enabled && secret('wh-fe-key', 'Clé Forward Email', fe.key, (v) => set({ 'bounce.forwardemail': { ...fe, key: v } }))}
+      <Toggle id="wh-lm" label="Lettermint" checked={lm.enabled} disabled={!canEdit} onChange={(v) => set({ 'bounce.lettermint': { ...lm, enabled: v } })}
+        hint={<>Webhook vers {url('lettermint')}</>} />
+      {lm.enabled && secret('wh-lm-key', 'Clé Lettermint', lm.key, (v) => set({ 'bounce.lettermint': { ...lm, key: v } }))}
+      <Toggle id="wh-azure" label="Azure Communication Services" checked={az.enabled} disabled={!canEdit} onChange={(v) => set({ 'bounce.azure': { ...az, enabled: v } })}
+        hint={<>Event Grid vers {url('azure')}</>} />
+      {az.enabled && (
+        <div className="grid-2">
+          <Field id="wh-azure-header" label="En-tête du secret">
+            <input id="wh-azure-header" type="text" className="mono" value={az.shared_secret_header} disabled={!canEdit} onChange={(e) => set({ 'bounce.azure': { ...az, shared_secret_header: e.target.value } })} />
+          </Field>
+          {secret('wh-azure-secret', 'Secret partagé', az.shared_secret, (v) => set({ 'bounce.azure': { ...az, shared_secret: v } }))}
+        </div>
+      )}
+    </>
+  );
+}
+
+const NEW_MESSENGER: Messenger = { enabled: true, name: '', root_url: '', username: '', password: '', max_conns: 5, timeout: '5s', max_msg_retries: 2 };
+
+// Postback messengers: listmonk posts each message to an address (SMS, WhatsApp, push…).
+function Messengers({ s, set, canEdit }: { s: SettingsData; set: Patch; canEdit: boolean }) {
+  const list = s.messengers ?? [];
+  const setM = (i: number, patch: Partial<Messenger>) => set({ messengers: list.map((m, j) => (j === i ? { ...m, ...patch } : m)) });
+  return (
+    <section className="panel settings-panel">
+      <h2>Autres canaux d’envoi</h2>
+      <Explain title="À quoi ça sert">
+        <p>
+          En plus de l’e-mail, une campagne peut partir par un autre canal (SMS, WhatsApp, notification…) grâce à un petit service
+          que vous hébergez : Relais lui envoie chaque message à son adresse, au format « postback » de listmonk, et le service
+          le transmet. Sans un tel service, cet onglet ne sert pas.
+        </p>
+      </Explain>
+      {list.map((m, i) => (
+        <div key={m.uuid ?? i} className="panel nested" role="group" aria-label={`Canal ${m.name || i + 1}`}>
+          <Toggle id={`ms-on-${i}`} label="Actif" checked={m.enabled} disabled={!canEdit} onChange={(v) => setM(i, { enabled: v })} />
+          <div className="grid-2">
+            <Field id={`ms-name-${i}`} label="Nom du canal" hint="Minuscules, chiffres et tirets, par exemple sms.">
+              <input id={`ms-name-${i}`} type="text" className="mono" value={m.name} disabled={!canEdit} onChange={(e) => setM(i, { name: e.target.value })} />
+            </Field>
+            <Field id={`ms-url-${i}`} label="Adresse du service">
+              <input id={`ms-url-${i}`} type="url" className="mono" value={m.root_url} disabled={!canEdit} onChange={(e) => setM(i, { root_url: e.target.value })} />
+            </Field>
+            <Field id={`ms-user-${i}`} label="Identifiant (facultatif)">
+              <input id={`ms-user-${i}`} type="text" value={m.username} disabled={!canEdit} onChange={(e) => setM(i, { username: e.target.value })} />
+            </Field>
+            <Field id={`ms-pwd-${i}`} label="Mot de passe (facultatif)" hint="Laissez vide pour garder le mot de passe enregistré.">
+              <input id={`ms-pwd-${i}`} type="password" autoComplete="new-password" placeholder="Enregistré" value={m.password} disabled={!canEdit}
+                onChange={(e) => setM(i, { password: e.target.value })} />
+            </Field>
+            <Num id={`ms-conns-${i}`} label="Connexions en parallèle" value={m.max_conns} min={1} disabled={!canEdit} onChange={(v) => setM(i, { max_conns: v })} />
+            <Num id={`ms-retries-${i}`} label="Nouvelles tentatives" value={m.max_msg_retries} disabled={!canEdit} onChange={(v) => setM(i, { max_msg_retries: v })} />
+          </div>
+          {canEdit && <button type="button" className="btn btn-sm btn-ghost self-start" onClick={() => set({ messengers: list.filter((_, j) => j !== i) })}>Retirer ce canal</button>}
+        </div>
+      ))}
+      {canEdit && <button type="button" className="btn btn-sm self-start" onClick={() => set({ messengers: [...list, NEW_MESSENGER] })}><Icon name="plus" size={14} /> Ajouter un canal</button>}
     </section>
   );
 }
@@ -541,6 +779,7 @@ export function Settings() {
           {tab === 'securite' && <Security s={draft} set={set} canEdit={canEdit} />}
           {tab === 'rebonds' && <BounceRules s={draft} set={set} canEdit={canEdit} />}
           {tab === 'medias' && <MediaStorage s={draft} set={set} canEdit={canEdit} />}
+          {tab === 'messagers' && <Messengers s={draft} set={set} canEdit={canEdit} />}
         </>
       )}
 

@@ -51,3 +51,20 @@ export interface PermissionGroup { group: string; permissions: string[] }
 
 export const permissionLabel = (p: string) => PERMISSION_LABELS[p] ?? p;
 export const groupLabel = (g: string) => PERMISSION_GROUPS[g] ?? g;
+
+// List roles: per list, nothing, read-only or read and manage.
+export type ListAccess = 'none' | 'get' | 'manage';
+export interface ListGrant { id: number; name: string; permissions: string[] }
+
+export function listAccess(grants: ListGrant[], listId: number): ListAccess {
+  const p = grants.find((g) => g.id === listId)?.permissions ?? [];
+  if (p.includes('list:manage')) return 'manage';
+  return p.includes('list:get') ? 'get' : 'none';
+}
+
+// Managing a list implies seeing it. Lists of other projects stay untouched.
+export function setListAccess(grants: ListGrant[], list: { id: number; name: string }, access: ListAccess): ListGrant[] {
+  const rest = grants.filter((g) => g.id !== list.id);
+  if (access === 'none') return rest;
+  return [...rest, { id: list.id, name: list.name, permissions: access === 'manage' ? ['list:get', 'list:manage'] : ['list:get'] }];
+}

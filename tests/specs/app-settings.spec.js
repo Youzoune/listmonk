@@ -99,4 +99,75 @@ test.describe('Relais settings', () => {
     await expect(code).toHaveValue(/name="next" value="https:\/\/club.fr\/merci"/);
     await expect(code).toHaveValue(/altcha-widget/);
   });
+
+  test('sets up single sign-on and keeps its secret', async ({ page }) => {
+    await page.goto(`${URL}?onglet=securite`);
+    await page.getByLabel('Proposer « Se connecter avec… » sur la page de connexion').check();
+    await expect(page.locator('.explain').filter({ hasText: 'adresse de retour' })).toBeAttached();
+    await page.getByLabel('Nom affiché').fill('Google');
+    await page.getByLabel('Adresse du fournisseur').fill('https://accounts.google.com');
+    await page.getByLabel('Identifiant client').fill('relais-client');
+    await page.getByLabel('Secret client').fill('secret-de-test');
+    await page.getByLabel('Créer le compte à la première connexion').check();
+    await page.getByLabel('Rôle des nouveaux comptes').selectOption({ index: 1 });
+    await page.getByRole('button', { name: 'Ajouter une règle' }).click();
+    await page.getByLabel('Valeur exacte').fill('marketing');
+    await page.getByRole('button', { name: 'Enregistrer' }).click();
+    await expect(page.locator('.save-bar')).toContainText('Enregistré', { timeout: 20000 });
+
+    let o = (await (await page.request.get('/api/settings')).json()).data['security.oidc'];
+    expect(o).toMatchObject({ enabled: true, provider_name: 'Google', client_id: 'relais-client', auto_create_users: true });
+    expect(o.client_secret).toMatch(/^•+$/);
+    expect(o.roles).toEqual([expect.objectContaining({ claim: 'groups', match: 'marketing' })]);
+
+    // Turning it off again keeps the saved secret.
+    await page.reload();
+    await page.getByLabel('Proposer « Se connecter avec… » sur la page de connexion').uncheck();
+    await page.getByRole('button', { name: 'Enregistrer' }).click();
+    await expect(page.locator('.save-bar')).toContainText('Enregistré', { timeout: 20000 });
+    o = (await (await page.request.get('/api/settings')).json()).data['security.oidc'];
+    expect(o.enabled).toBe(false);
+    expect(o.client_secret.length).toBe('secret-de-test'.length);
+  });
+
+  test('sets the bounce mailbox and a provider webhook', async ({ page }) => {
+    await page.goto(`${URL}?onglet=rebonds`);
+    const box = page.getByRole('group', { name: 'Boîte de rebonds 1' });
+    await box.getByLabel('Adresse de retour (Return-Path)').fill('rebonds@club.fr');
+    await box.getByLabel('Serveur POP3').fill('pop3.mail.ovh.net');
+    await box.getByLabel('Identifiant de la boîte').fill('rebonds@club.fr');
+    await box.getByLabel('Mot de passe de la boîte').fill('mot-de-passe-pop');
+    await page.getByLabel('Recevoir les rebonds par webhook').check();
+    await page.getByLabel('Postmark').check();
+    await page.getByLabel('Identifiant Postmark').fill('relais');
+    await page.getByLabel('Mot de passe Postmark').fill('pm-secret');
+    await expect(page.getByText(/\/webhooks\/service\/postmark/)).toBeVisible();
+    await page.getByRole('button', { name: 'Enregistrer' }).click();
+    await expect(page.locator('.save-bar')).toContainText('Enregistré', { timeout: 20000 });
+
+    const s = (await (await page.request.get('/api/settings')).json()).data;
+    expect(s['bounce.mailboxes'][0]).toMatchObject({ host: 'pop3.mail.ovh.net', return_path: 'rebonds@club.fr', username: 'rebonds@club.fr' });
+    expect(s['bounce.mailboxes'][0].password).toMatch(/^•+$/);
+    expect(s['bounce.postmark']).toMatchObject({ enabled: true, username: 'relais' });
+    expect(s['bounce.postmark'].password.length).toBe('pm-secret'.length);
+  });
+
+  test('adds a postback channel', async ({ page }) => {
+    await page.goto(`${URL}?onglet=messagers`);
+    await page.getByRole('button', { name: 'Ajouter un canal' }).click();
+    await page.getByLabel('Nom du canal').fill('sms');
+    await page.getByLabel('Adresse du service').fill('http://127.0.0.1:9999/sms');
+    await page.getByLabel('Mot de passe (facultatif)').fill('canal-secret');
+    await page.getByRole('button', { name: 'Enregistrer' }).click();
+    await expect(page.locator('.save-bar')).toContainText('Enregistré', { timeout: 20000 });
+    const s = (await (await page.request.get('/api/settings')).json()).data;
+    expect(s.messengers).toEqual([expect.objectContaining({ name: 'sms', root_url: 'http://127.0.0.1:9999/sms', enabled: true })]);
+    expect(s.messengers[0].uuid).toBeTruthy();
+
+    await page.reload();
+    await page.getByRole('button', { name: 'Retirer ce canal' }).click();
+    await page.getByRole('button', { name: 'Enregistrer' }).click();
+    await expect(page.locator('.save-bar')).toContainText('Enregistré', { timeout: 20000 });
+    expect((await (await page.request.get('/api/settings')).json()).data.messengers).toEqual([]);
+  });
 });

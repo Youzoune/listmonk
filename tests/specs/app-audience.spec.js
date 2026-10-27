@@ -91,4 +91,30 @@ test.describe('Relais audience', () => {
     await page.getByRole('button', { name: 'Nouvel import' }).click();
     await expect(page.getByLabel('Fichier CSV ou ZIP')).toBeVisible();
   });
+
+  test('exports the filtered contacts as CSV', async ({ page }) => {
+    await page.goto('/app/audience?q=anon');
+    await expect(page.getByText(/^1 contact$/)).toBeVisible();
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('link', { name: 'Exporter en CSV' }).click(),
+    ]);
+    expect(download.suggestedFilename()).toBe('subscribers.csv');
+    const fs = await import('node:fs/promises');
+    const csv = await fs.readFile(await download.path(), 'utf8');
+    expect(csv).toContain('anon@example.com');
+    expect(csv).not.toContain('john@example.com');
+  });
+
+  test('searches contacts with an SQL condition', async ({ page }) => {
+    await page.goto('/app/audience');
+    await page.getByRole('button', { name: 'Recherche avancée' }).click();
+    await page.getByLabel('Condition SQL sur les contacts').fill("subscribers.email LIKE 'anon%'");
+    await page.getByRole('button', { name: 'Rechercher' }).click();
+    await expect(page.getByText(/^1 contact$/)).toBeVisible();
+    await expect(page.locator('tbody tr')).toHaveCount(1);
+    await expect(page).toHaveURL(/sql=/);
+    await page.getByRole('button', { name: 'Effacer' }).click();
+    await expect(page.locator('tbody tr')).not.toHaveCount(1);
+  });
 });

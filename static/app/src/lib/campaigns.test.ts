@@ -10,7 +10,8 @@ describe('campaign body', () => {
 
   it('keeps other HTML as HTML', () => {
     expect(campaignHTMLToText('<h1>Titre</h1><p>x</p>')).toBeNull();
-    expect(campaignHTMLToText('<p>Un <strong>mot</strong></p>')).toBeNull();
+    expect(campaignHTMLToText('<p>Un <strong class="x">mot</strong></p>')).toBeNull();
+    expect(campaignHTMLToText('<p>Un <strong>mot</strong></p>')).toBe('Un **mot**');
     expect(campaignHTMLToText('')).toBe('');
   });
 });

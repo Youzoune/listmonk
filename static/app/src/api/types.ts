@@ -171,6 +171,12 @@ export interface Settings {
   'privacy.allow_wipe': boolean;
   'privacy.record_optin_ip': boolean;
   'security.captcha': { altcha: { enabled: boolean; complexity: number }; hcaptcha: { enabled: boolean; key: string; secret: string } };
+  'security.oidc': {
+    enabled: boolean; logout: boolean; verify_email: boolean; provider_url: string; provider_name: string;
+    client_id: string; client_secret: string; auto_create_users: boolean;
+    default_user_role_id: number | null; default_list_role_id: number | null;
+    roles: { claim: string; match: string; user_role_id?: number; list_role_id?: number }[] | null;
+  };
   'security.session_duration': string;
   'security.trusted_urls': string[];
   'upload.provider': 'filesystem' | 's3';
@@ -188,6 +194,15 @@ export interface Settings {
   'bounce.enabled': boolean;
   'bounce.webhooks_enabled': boolean;
   'bounce.actions': Record<'soft' | 'hard' | 'complaint', { count: number; action: 'none' | 'unsubscribe' | 'blocklist' | 'delete' }>;
+  'bounce.ses_enabled': boolean;
+  'bounce.sendgrid_enabled': boolean;
+  'bounce.sendgrid_key': string;
+  'bounce.azure': { enabled: boolean; shared_secret: string; shared_secret_header: string };
+  'bounce.postmark': { enabled: boolean; username: string; password: string };
+  'bounce.forwardemail': { enabled: boolean; key: string };
+  'bounce.lettermint': { enabled: boolean; key: string };
+  'bounce.mailboxes': BounceBox[];
+  messengers: Messenger[];
   [key: string]: unknown;
 }
 
@@ -327,7 +342,19 @@ export interface ImportParams {
   lists: number[];
 }
 
+export interface Messenger {
+  uuid?: string; enabled: boolean; name: string; root_url: string; username: string; password: string;
+  max_conns: number; timeout: string; max_msg_retries: number;
+}
+
+export interface BounceBox {
+  uuid?: string; enabled: boolean; type: 'pop'; host: string; port: number; auth_protocol: 'none' | 'userpass' | 'cram';
+  return_path: string; username: string; password: string; tls_enabled: boolean; tls_skip_verify: boolean; scan_interval: string;
+}
+
 export interface Role { id: number; name: string; permissions: string[] }
+
+export interface ListRole { id: number; name: string; lists: { id: number; name: string; permissions: string[] }[] }
 
 export interface UserFull extends User {
   password_login: boolean;
