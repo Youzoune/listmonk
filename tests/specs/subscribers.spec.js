@@ -69,8 +69,11 @@ async function bulkManageLists(page, {
     await dialog.getByTestId('preconfirm').check();
   }
 
+  // The page reloads itself once the change is applied: wait for it so that a
+  // following page.goto() doesn't race the reload.
   await Promise.all([
     page.waitForResponse((r) => /\/api\/subscribers(\/query)?\/lists/.test(r.url()) && r.request().method() === 'PUT'),
+    page.waitForEvent('load'),
     dialog.locator('button[type=submit]').click(),
   ]);
 }

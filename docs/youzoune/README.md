@@ -12,9 +12,9 @@ Point de départ : `master` upstream au commit `8216c4f1` (après la v7.0.0).
 | 1 | Fondations multi-projet : tables, migration, API de gestion des projets, permissions | 4 | fait (PR #1) |
 | 2 | Isolation : projet courant sur chaque requête, filtrage de toutes les requêtes SQL (listes, abonnés, campagnes, modèles, médias, imports, exports, tableaux de bord, rebonds) | 4 | fait (migration `v7.2.0`) |
 | 3 | Interface : sélecteur de projet, page de gestion des projets, accès des utilisateurs | 4 | fait (front React, migration `v7.3.0`) |
-| 4 | SMTP par projet, SMTP dédié aux notifications système, cadence et warm-up par SMTP | 1, 2, 3 | à faire |
+| 4 | SMTP par projet, SMTP dédié aux notifications système, cadence et warm-up par SMTP (voir [relais.md](relais.md)) | 1, 2, 3 | fait (migration `v7.4.0`) |
 | 5 | Pages publiques par projet (domaine), désinscription et préférences limitées au projet | 5 | à faire |
-| 6 | Fiabilité au redémarrage pendant les envois | 6 | à faire |
+| 6 | Fiabilité au redémarrage pendant les envois | 6 | commencé : redémarrage sûr quand les campagnes attendent leur relais (lot 4) |
 | 7 | Front React « Relais » dans `static/app`, servi sous `/app` (voir [static/app/README.md](../../static/app/README.md)) | Front | en cours |
 
 Le détail de conception du multi-projet est dans [multi-projet.md](multi-projet.md).

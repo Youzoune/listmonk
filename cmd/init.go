@@ -682,10 +682,11 @@ func initCampaignManager(msgrs []manager.Messenger, q *models.Queries, u *UrlCon
 		ScanCampaigns:         !ko.Bool("passive"),
 	}, newManagerStore(q, co, md), i, lo)
 
-	// Attach all messengers to the campaign manager.
+	// Attach all messengers to the campaign manager, with their cadence and warm-up.
 	for _, m := range msgrs {
 		mgr.AddMessenger(m)
 	}
+	initRelays(mgr, msgrs, ko)
 
 	return mgr
 }
@@ -749,7 +750,8 @@ func initSMTPMessengers() []manager.Messenger {
 			lo.Fatalf("error reading SMTP config: %v", err)
 		}
 
-		if item.Bool("exclude_from_default") {
+		// Relays of a project never join the default pool, which every project can use.
+		if item.Bool("exclude_from_default") || item.Int("project_id") != 0 {
 			if s.Name == "" {
 				lo.Println("warning: SMTP server excluded from default has no name and cannot be selected")
 			}

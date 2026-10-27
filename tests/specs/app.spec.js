@@ -75,10 +75,12 @@ test.describe('Relais app', () => {
     await expect(rows.first()).toContainText('john@example.com');
   });
 
-  test('shows the SMTP relays and the instance-wide cadence', async ({ page }) => {
+  test('shows the default relay and the SMTP servers', async ({ page }) => {
     await page.goto(`${APP}/relais`);
-    await expect(page.locator('.relay-card').first()).toContainText('Actif');
-    await expect(page.getByRole('heading', { name: 'Cadence actuelle' })).toBeVisible();
+    const list = page.getByRole('navigation', { name: 'Relais' });
+    await expect(list.getByRole('button', { name: /Relais par défaut/ })).toBeVisible();
+    await list.getByRole('button', { name: /Relais par défaut/ }).click();
+    await expect(page.locator('.relay-detail')).toContainText('serveurs SMTP partagés');
   });
 
   test('creates and launches a campaign with readable variables', async ({ page }) => {

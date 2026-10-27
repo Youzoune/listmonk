@@ -8,6 +8,8 @@ type Queries struct {
 	GetDashboardCounts        *sqlx.Stmt `query:"get-dashboard-counts"`
 	GetProjectDashboardCounts *sqlx.Stmt `query:"get-project-dashboard-counts"`
 	GetProjectDashboardCharts *sqlx.Stmt `query:"get-project-dashboard-charts"`
+	GetRelayUsage             *sqlx.Stmt `query:"get-relay-usage"`
+	AddRelayUsage             *sqlx.Stmt `query:"add-relay-usage"`
 
 	InsertSubscriber                *sqlx.Stmt `query:"insert-subscriber"`
 	UpsertSubscriber                *sqlx.Stmt `query:"upsert-subscriber"`

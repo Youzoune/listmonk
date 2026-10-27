@@ -251,6 +251,22 @@ func main() {
 		}
 	}
 
+	// System notifications (opt-in confirmations, admin alerts, password resets)
+	// can go through a relay of their own instead of the default pool.
+	if sys := ko.String("app.system_messenger"); sys != "" && sys != email.MessengerName {
+		found := false
+		for _, m := range msgrs {
+			if em, ok := m.(*email.Emailer); ok && m.Name() == sys {
+				emailMsgr, found = em, true
+			}
+		}
+		if found {
+			lo.Printf("system notifications go through relay %s", sys)
+		} else {
+			lo.Printf("warning: system relay %s is not available, using the default pool", sys)
+		}
+	}
+
 	// Initialize the global admin/sub e-mail notifier.
 	initNotifs(fs, i18n, emailMsgr, urlCfg, ko)
 

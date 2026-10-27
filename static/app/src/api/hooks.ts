@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, query } from './client';
 import type {
   Campaign, CampaignStatus, DashboardCharts, DashboardCounts, List, NewCampaign, Page, Profile, Project,
-  ProjectInput, ServerConfig, Settings, Subscriber, User,
+  ProjectInput, Relay, RelayInput, ServerConfig, Settings, Subscriber, User,
 } from './types';
 
 // Query keys start with the project so that switching project refetches everything.
@@ -16,8 +16,9 @@ export function useProjects(enabled: boolean) {
   return useQuery({ queryKey: ['projects'], queryFn: () => api<Project[]>('/api/projects'), enabled, staleTime: 60_000 });
 }
 
-export function useServerConfig() {
-  return useQuery({ queryKey: ['config'], queryFn: () => api<ServerConfig>('/api/config'), staleTime: 5 * 60_000 });
+// The config lists the relays the current project may use: it's per project.
+export function useServerConfig(project: number | null) {
+  return useQuery({ queryKey: key(project, 'config'), queryFn: () => api<ServerConfig>('/api/config'), staleTime: 5 * 60_000 });
 }
 
 export function useDashboard(project: number | null) {
@@ -129,5 +130,21 @@ export function useSetUserProjects() {
     },
     onError: (_err, _vars, ctx) => ctx?.previous.forEach(([key, data]) => qc.setQueryData(key, data)),
     onSettled: () => qc.invalidateQueries({ queryKey: ['users-projects'] }),
+  });
+}
+
+export function useRelays(project: number | null, enabled = true) {
+  return useQuery({ queryKey: key(project, 'relays'), queryFn: () => api<Relay[]>('/api/relays'), enabled, refetchInterval: 30_000 });
+}
+
+// Saves a relay's project, cadence and warm-up. The server reloads to apply
+// them, unless campaigns are running (needs_restart).
+export function useSaveRelay(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uuid, relay }: { uuid: string; relay: RelayInput }) =>
+      api<true | { needs_restart: boolean }>(`/api/relays/${uuid}`, { method: 'PUT', json: relay }),
+    // Give the server a moment to reload before reading the relays again.
+    onSuccess: () => setTimeout(() => qc.invalidateQueries({ queryKey: key(project, 'relays') }), 1500),
   });
 }

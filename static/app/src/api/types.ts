@@ -146,3 +146,56 @@ export interface ProjectInput {
   domain: string | null;
   description: string;
 }
+
+export interface RelayCadence {
+  per_minute: number;
+  per_hour: number;
+  per_day: number;
+  days: number[] | null;
+  from_hour: number;
+  to_hour: number;
+  timezone: string;
+}
+
+export interface RelayWarmup {
+  enabled: boolean;
+  start: number;
+  growth: number;
+  cap: number;
+  since: string;
+}
+
+export interface RelayStatus {
+  name: string;
+  day: string;
+  sent_today: number;
+  limit_today: number;
+  warmup_day: number;
+  warmup_done_day: number;
+  open_now: boolean;
+  next_send_at: string;
+  has_cadence: boolean;
+}
+
+export interface Relay {
+  uuid: string;
+  name: string;
+  host: string;
+  port: number;
+  enabled: boolean;
+  pool: boolean;
+  in_default_pool: boolean;
+  project_id: number;
+  system: boolean;
+  cadence: RelayCadence;
+  warmup: RelayWarmup;
+  servers?: number;
+  status: RelayStatus | null;
+}
+
+export interface RelayInput {
+  project_id: number;
+  cadence: RelayCadence;
+  warmup: RelayWarmup;
+  system: boolean;
+}

@@ -183,3 +183,16 @@ func (s *store) DeleteSubscriber(id int64) error {
 	_, err := s.queries.DeleteSubscribers.Exec(pq.Int64Array{id})
 	return err
 }
+
+// GetRelayUsage returns the number of messages a relay sent on a day (YYYY-MM-DD).
+func (s *store) GetRelayUsage(relay, day string) (int, error) {
+	var n int
+	err := s.queries.GetRelayUsage.Get(&n, relay, day)
+	return n, err
+}
+
+// AddRelayUsage adds n messages to a relay's count for a day (YYYY-MM-DD).
+func (s *store) AddRelayUsage(relay, day string, n int) error {
+	_, err := s.queries.AddRelayUsage.Exec(relay, day, n)
+	return err
+}

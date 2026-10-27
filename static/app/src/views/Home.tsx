@@ -1,9 +1,10 @@
 import { Link } from 'react-router';
-import { useCampaigns, useDashboard } from '../api/hooks';
+import { useCampaigns, useDashboard, useRelays } from '../api/hooks';
 import type { Campaign } from '../api/types';
-import { CampaignChip, ErrorState, Icon, Loading, Progress, Sparkline } from '../components/ui';
+import { CampaignChip, Chip, ErrorState, Icon, Loading, Progress, Sparkline } from '../components/ui';
 import { count, dateTime, num, percent, relayLabel } from '../lib/format';
 import { useProject } from '../project';
+import { relayName } from '../lib/relays';
 
 const BOUNCE_ALERT = 0.03;
 
@@ -30,6 +31,10 @@ export function Home() {
   const active = useCampaigns(project.id, { status: ['running', 'paused'], perPage: 10 });
   const scheduled = useCampaigns(project.id, { status: ['scheduled'], perPage: 5 });
   const finished = useCampaigns(project.id, { status: ['finished'], perPage: 20 });
+  const canRelays = can('settings:get', 'campaigns:manage', 'campaigns:manage_all');
+  const relays = useRelays(project.id, canRelays);
+  // Relays worth a look today: those with a cadence of their own or that sent something.
+  const busyRelays = (relays.data ?? []).filter((r) => r.enabled && r.status && (r.status.has_cadence || r.status.sent_today > 0));
 
   const alerts: { tone: 'bad' | 'warn'; text: string }[] = [];
   for (const c of [...(active.data?.results ?? []), ...(finished.data?.results ?? [])]) {
@@ -78,6 +83,40 @@ export function Home() {
           <div><dt>E-mails envoyés</dt><dd className="num">{counts.data ? num(counts.data.messages) : '…'}</dd>
             <span className="sub">depuis le début</span></div>
         </dl>
+      )}
+
+      {busyRelays.length > 0 && (
+        <section className="panel">
+          <div className="panel-head">
+            <h2>Envois du jour, par relais</h2>
+            <Link className="link" to="/relais">Gérer les relais <Icon name="arrow" size={15} /></Link>
+          </div>
+          <div className="relay-today">
+            {busyRelays.map((r) => {
+              const s = r.status!;
+              const pct = s.limit_today > 0 ? Math.min(100, (s.sent_today / s.limit_today) * 100) : 0;
+              return (
+                <div key={r.uuid || r.name} className="relay-today-item">
+                  <div className="relay-today-top">
+                    <strong>{relayName(r)}</strong>
+                    {!s.open_now ? <Chip tone="warn" icon="clock">Hors plage</Chip>
+                      : s.warmup_day > 0 && s.warmup_done_day > 0 && s.warmup_day < s.warmup_done_day
+                        ? <Chip tone="brand">Warm-up · jour {s.warmup_day} sur {s.warmup_done_day}</Chip>
+                        : s.limit_today > 0 && s.sent_today >= s.limit_today ? <Chip tone="warn">Quota atteint</Chip>
+                          : <Chip tone="ok" icon="check">Disponible</Chip>}
+                  </div>
+                  <div className="quota">
+                    {s.limit_today > 0 && <div className="quota-bar" aria-hidden="true"><span style={{ width: `${pct}%` }} /></div>}
+                    <div className="quota-legend num">
+                      <span><strong>{num(s.sent_today)}</strong> envoyés</span>
+                      <span>{s.limit_today > 0 ? `${num(Math.max(0, s.limit_today - s.sent_today))} restants sur ${num(s.limit_today)}` : 'pas de plafond'}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       <div className="grid-2">

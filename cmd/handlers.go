@@ -154,6 +154,8 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 		g.GET("/api/dashboard/counts", a.GetDashboardCounts)
 		g.GET("/api/dashboard/campaigns", a.GetDashboardCampaigns)
 
+		g.GET("/api/relays", pm(a.GetRelays, auth.PermSettingsGet, auth.PermCampaignsManage, auth.PermCampaignsManageAll))
+		g.PUT("/api/relays/:uuid", pm(a.UpdateRelay, auth.PermSettingsManage))
 		g.GET("/api/settings", pm(a.GetSettings, auth.PermSettingsGet))
 		g.PUT("/api/settings", pm(a.UpdateSettings, auth.PermSettingsManage))
 		g.PUT("/api/settings/:key", pm(a.UpdateSettingsByKey, auth.PermSettingsManage))

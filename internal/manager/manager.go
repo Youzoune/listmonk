@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"maps"
@@ -56,6 +57,10 @@ type Store interface {
 	UpdateCampaignStatus(campID int, status string) error
 	UpdateCampaignCounts(campID int, toSend int, sent int, lastSubID int) error
 	CreateLink(url string) (string, error)
+
+	// Daily send counts of relays (messengers), kept across restarts for cadence and warm-up.
+	GetRelayUsage(relay, day string) (int, error)
+	AddRelayUsage(relay, day string, n int) error
 	BlocklistSubscriber(id int64) error
 	DeleteSubscriber(id int64) error
 }
@@ -110,6 +115,13 @@ type Manager struct {
 	// sending further messages.
 	slidingCount int
 	slidingStart time.Time
+
+	// Cadence and warm-up limiters, per messenger.
+	relays    map[string]*relayLimiter
+	relaysMut sync.RWMutex
+
+	// Campaign messages queued or being sent.
+	inFlight atomic.Int64
 
 	tplFuncs template.FuncMap
 }
@@ -191,6 +203,7 @@ func New(cfg Config, store Store, i *i18n.I18n, l *log.Logger) *Manager {
 		pipes:        make(map[int]*pipe),
 		tpls:         make(map[int]*models.Template),
 		links:        make(map[string]string),
+		relays:       make(map[string]*relayLimiter),
 		nextPipes:    make(chan *pipe, 1000),
 		campMsgQ:     make(chan CampaignMessage, cfg.Concurrency*cfg.MessageRate*2),
 		msgQ:         make(chan models.Message, cfg.Concurrency*cfg.MessageRate*2),
@@ -210,6 +223,101 @@ func (m *Manager) AddMessenger(msg Messenger) error {
 	m.messengers[id] = msg
 
 	return nil
+}
+
+// SetRelayLimits sets the cadence and warm-up of a messenger. Messengers
+// without limits are still counted so that their usage can be shown.
+func (m *Manager) SetRelayLimits(name string, lim RelayLimits) {
+	m.relaysMut.Lock()
+	m.relays[name] = newRelayLimiter(name, lim)
+	m.relaysMut.Unlock()
+}
+
+func (m *Manager) relay(name string) *relayLimiter {
+	m.relaysMut.RLock()
+	defer m.relaysMut.RUnlock()
+	return m.relays[name]
+}
+
+// RelayStatuses returns the usage of every relay.
+func (m *Manager) RelayStatuses() []RelayStatus {
+	m.relaysMut.RLock()
+	defer m.relaysMut.RUnlock()
+
+	now := time.Now()
+	out := make([]RelayStatus, 0, len(m.relays))
+	for _, r := range m.relays {
+		out = append(out, r.status(now))
+	}
+	return out
+}
+
+// loadRelayUsage reads today's persisted counts into the relay limiters.
+func (m *Manager) loadRelayUsage() {
+	m.relaysMut.RLock()
+	defer m.relaysMut.RUnlock()
+
+	now := time.Now()
+	for name, r := range m.relays {
+		day := now.In(r.lim.Location).Format(time.DateOnly)
+		n, err := m.store.GetRelayUsage(name, day)
+		if err != nil {
+			m.log.Printf("error loading usage of relay %s: %v", name, err)
+			continue
+		}
+		r.load(day, n)
+	}
+}
+
+// syncRelayUsage saves the relays' counts that haven't been saved yet.
+func (m *Manager) syncRelayUsage() {
+	m.relaysMut.RLock()
+	defer m.relaysMut.RUnlock()
+
+	for name, r := range m.relays {
+		counts := r.takeUnsynced()
+		failed := map[string]int{}
+		for day, n := range counts {
+			if n == 0 {
+				continue
+			}
+			if err := m.store.AddRelayUsage(name, day, n); err != nil {
+				m.log.Printf("error saving usage of relay %s: %v", name, err)
+				failed[day] = n
+			}
+		}
+		if len(failed) > 0 {
+			r.giveBack(failed)
+		}
+	}
+}
+
+// requeueAfter puts a throttled pipe back in the processing queue once its
+// relay may send again, or as soon as the campaign is paused or cancelled.
+func (m *Manager) requeueAfter(p *pipe, wait time.Duration) {
+	// The manager may be closed while waiting (app reload): don't crash the
+	// process on the closed queue, the campaign resumes after the reload.
+	defer func() { _ = recover() }()
+
+	p.waiting.Store(true)
+	defer p.waiting.Store(false)
+
+	deadline := time.Now().Add(wait)
+	for !p.stopped.Load() {
+		left := time.Until(deadline)
+		if left <= 0 {
+			break
+		}
+		time.Sleep(min(left, 15*time.Second))
+	}
+
+	select {
+	case m.nextPipes <- p:
+	default:
+		// Same as a full queue in Run(): release the pipe, scanCampaigns() picks it up later.
+		p.Stop(false)
+		p.wg.Done()
+	}
 }
 
 // PushMessage pushes an arbitrary non-campaign Message to be sent out by the workers.
@@ -239,9 +347,11 @@ func (m *Manager) PushCampaignMessage(msg CampaignMessage) error {
 		return err
 	}
 
+	m.inFlight.Add(1)
 	select {
 	case m.campMsgQ <- msg:
 	case <-t.C:
+		m.inFlight.Add(-1)
 		m.log.Printf("message push timed out: '%s'", msg.Subject())
 		return errors.New("message push timed out")
 	}
@@ -254,6 +364,25 @@ func (m *Manager) HasMessenger(id string) bool {
 	_, ok := m.messengers[id]
 
 	return ok
+}
+
+// IdleForRestart tells whether the app can reload without losing or
+// repeating sends: every running campaign is only waiting for its relay's
+// cadence and no campaign message is queued or being sent. Their progress is
+// saved by Close().
+func (m *Manager) IdleForRestart() bool {
+	if m.inFlight.Load() > 0 {
+		return false
+	}
+
+	m.pipesMut.RLock()
+	defer m.pipesMut.RUnlock()
+	for _, p := range m.pipes {
+		if !p.waiting.Load() {
+			return false
+		}
+	}
+	return true
 }
 
 // HasRunningCampaigns checks if there are any active campaigns.
@@ -291,6 +420,9 @@ func (m *Manager) Run() {
 		go m.scanCampaigns(m.cfg.ScanInterval)
 	}
 
+	// Resume the relays' daily counts (cadence and warm-up survive restarts).
+	m.loadRelayUsage()
+
 	// Spawn N message workers.
 	for i := 0; i < m.cfg.Concurrency; i++ {
 		go m.worker()
@@ -299,7 +431,7 @@ func (m *Manager) Run() {
 	// Indefinitely wait on the pipe queue to fetch the next set of subscribers
 	// for any active campaigns.
 	for p := range m.nextPipes {
-		has, err := p.NextSubscribers()
+		has, wait, err := p.NextSubscribers()
 		if err != nil {
 			m.log.Printf("error processing campaign batch (%s): %v", p.camp.Name, err)
 
@@ -307,6 +439,15 @@ func (m *Manager) Run() {
 			// The cleanup() records the state in DB and scanCampaigns() picks it up at a later point.
 			p.Stop(false)
 			p.wg.Done()
+			continue
+		}
+
+		if has && wait > 0 {
+			// The campaign's relay can't send right now. Let the other campaigns
+			// go on and come back to this one when the relay opens.
+			m.log.Printf("relay %s of campaign (%s) is at its cadence limit, resuming in %s",
+				p.camp.Messenger, p.camp.Name, wait.Round(time.Second))
+			go m.requeueAfter(p, wait)
 			continue
 		}
 
@@ -443,8 +584,20 @@ func (m *Manager) StopCampaign(id int) {
 	m.pipesMut.RUnlock()
 }
 
-// Close closes and exits the campaign manager.
+// Close saves the progress of the running campaigns and the relays' counts,
+// then closes and exits the campaign manager.
 func (m *Manager) Close() {
+	m.countsMut.Lock()
+	m.pipesMut.RLock()
+	for _, p := range m.pipes {
+		if err := m.store.UpdateCampaignCounts(p.camp.ID, 0, int(p.sent.Swap(0)), p.getCheckpoint()); err != nil {
+			m.log.Printf("error saving campaign (%s) progress on close: %v", p.camp.Name, err)
+		}
+	}
+	m.pipesMut.RUnlock()
+	m.syncRelayUsage()
+	m.countsMut.Unlock()
+
 	close(m.nextPipes)
 	close(m.msgQ)
 }
@@ -506,6 +659,7 @@ func (m *Manager) worker() {
 			if msg.pipe != nil && msg.pipe.stopped.Load() {
 				// Reduce the message counter on the pipe.
 				msg.pipe.wg.Done()
+				m.inFlight.Add(-1)
 				continue
 			}
 
@@ -574,6 +728,7 @@ func (m *Manager) worker() {
 				}
 				msg.pipe.wg.Done()
 			}
+			m.inFlight.Add(-1)
 
 		// Arbitrary message.
 		case msg, ok := <-m.msgQ:
@@ -581,9 +736,12 @@ func (m *Manager) worker() {
 				return
 			}
 
-			// Push the message to the messenger.
+			// Push the message to the messenger. Such messages aren't throttled
+			// but count towards the relay's daily usage.
 			if err := m.messengers[msg.Messenger].Push(msg); err != nil {
 				m.log.Printf("error sending message '%s': %v", msg.Subject, err)
+			} else if r := m.relay(msg.Messenger); r != nil {
+				r.record(time.Now())
 			}
 		}
 	}
@@ -612,6 +770,9 @@ func (m *Manager) nextCampaigns() ([]*models.Campaign, error) {
 	}
 
 	m.pipesMut.RUnlock()
+
+	// Save the relays' daily counts along with the campaign counts.
+	m.syncRelayUsage()
 
 	// A returned error does not guarantee the writes in the query were rolled back.
 	// The sent count shouldn't be restored, which could result in double sends.

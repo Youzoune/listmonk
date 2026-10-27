@@ -86,3 +86,10 @@ views AS (
 )
 SELECT JSON_BUILD_OBJECT('link_clicks', COALESCE((SELECT * FROM clicks), '[]'),
                          'campaign_views', COALESCE((SELECT * FROM views), '[]'));
+
+-- name: get-relay-usage
+SELECT COALESCE((SELECT sent FROM relay_usage WHERE relay = $1 AND day = $2::DATE), 0);
+
+-- name: add-relay-usage
+INSERT INTO relay_usage (relay, day, sent) VALUES ($1, $2::DATE, $3)
+    ON CONFLICT (relay, day) DO UPDATE SET sent = relay_usage.sent + EXCLUDED.sent, updated_at = NOW();

@@ -404,3 +404,7 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 .switcher-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; border-top: 1px solid var(--line); padding: 8px 6px 2px; }
 .switcher-foot a { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: .875rem; color: var(--fg); min-height: 36px; }
 .saved { display: flex; align-items: center; gap: 6px; color: var(--ok); font-weight: 600; font-size: .9rem; }
+.status-dot.off { background: var(--muted); }
+.field select:disabled, .field input:disabled { opacity: .7; }
+.field-num .input-unit { min-height: 44px; }
+.boot { padding: 48px 24px; color: var(--muted); text-align: center; }

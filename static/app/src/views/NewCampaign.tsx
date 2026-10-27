@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { useCreateCampaign, useLists, useServerConfig } from '../api/hooks';
-import { ErrorState, Field, Icon, Loading, Upcoming } from '../components/ui';
+import { useCreateCampaign, useLists, useRelays, useServerConfig } from '../api/hooks';
+import { ErrorState, Field, Icon, Loading } from '../components/ui';
 import { textToCampaignHTML } from '../lib/body';
-import { num, relayLabel, senderName } from '../lib/format';
+import { num, senderName } from '../lib/format';
+import { cadenceSummary, hasCadence, relayName, toCadence } from '../lib/relays';
+import { estimateEnd } from '../lib/sending';
 import { VARIABLES, preview, toTemplate } from '../lib/variables';
 import { useProject } from '../project';
 
@@ -22,7 +24,8 @@ export function NewCampaign() {
   const { project, can } = useProject();
   const navigate = useNavigate();
   const lists = useLists(project.id);
-  const config = useServerConfig();
+  const config = useServerConfig(project.id);
+  const relays = useRelays(project.id);
   const create = useCreateCampaign(project.id);
   const canSend = can('campaigns:send');
 
@@ -103,6 +106,15 @@ export function NewCampaign() {
     );
   };
 
+  const relayList = (relays.data ?? []).filter((r) => r.enabled && config.data.messengers.includes(r.name));
+  const relay = relayList.find((r) => r.name === messenger);
+  const relayLabel = (m: string) => relayName({ name: m, pool: m === 'email' });
+  const startAt = start === 'scheduled' ? new Date(sendAt) : new Date();
+  const estimate = relay && hasCadence(relay.cadence, relay.warmup) && count > 0
+    ? estimateEnd(toCadence(relay.cadence, relay.warmup), count, startAt, start === 'scheduled' ? 0 : relay.status?.sent_today ?? 0)
+    : null;
+  const fmtEnd = (d: Date) => d.toLocaleString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
+
   const action = start === 'now' ? 'Lancer la campagne' : start === 'scheduled' ? 'Planifier la campagne' : 'Enregistrer le brouillon';
 
   return (
@@ -175,15 +187,23 @@ export function NewCampaign() {
             <>
               <h2>Par quel relais, et quand ?</h2>
               <div className="choice-list">
-                {config.data.messengers.map((m) => (
-                  <label key={m} className={`choice ${messenger === m ? 'is-on' : ''}`} htmlFor={`relay-${m}`}>
-                    <input id={`relay-${m}`} type="radio" name="relay" checked={messenger === m} onChange={() => setMessenger(m)} />
-                    <span className="choice-body">
-                      <span className="strong">{relayLabel(m)}</span>
-                      <span className="sub">{m === 'email' ? 'Répartit les envois sur les serveurs SMTP par défaut' : 'Serveur SMTP dédié'}</span>
-                    </span>
-                  </label>
-                ))}
+                {(relayList.length ? relayList.map((r) => r.name) : config.data.messengers).map((m) => {
+                  const r = relayList.find((x) => x.name === m);
+                  const left = r?.status && r.status.limit_today > 0 ? Math.max(0, r.status.limit_today - r.status.sent_today) : null;
+                  return (
+                    <label key={m} className={`choice ${messenger === m ? 'is-on' : ''}`} htmlFor={`relay-${m}`}>
+                      <input id={`relay-${m}`} type="radio" name="relay" checked={messenger === m} onChange={() => setMessenger(m)} />
+                      <span className="choice-body">
+                        <span className="strong">{relayLabel(m)}</span>
+                        <span className="sub">
+                          {m === 'email' ? 'Répartit les envois sur les serveurs SMTP partagés' : r ? cadenceSummary(r.cadence, r.warmup) : 'Serveur SMTP dédié'}
+                          {r && r.project_id !== 0 ? ' · réservé à ce projet' : ''}
+                        </span>
+                      </span>
+                      {left !== null && <span className="num small">{num(left)} dispo. aujourd’hui</span>}
+                    </label>
+                  );
+                })}
               </div>
               <Field id="from" label="Expéditeur">
                 <select id="from" value={sender} onChange={(e) => setFrom(e.target.value)}>
@@ -201,7 +221,7 @@ export function NewCampaign() {
                   <input id="send-at" type="datetime-local" value={sendAt} onChange={(e) => setSendAt(e.target.value)} />
                 </Field>
               )}
-              <Upcoming lot="Lot 4">La cadence, la plage d’envoi et le warm-up se régleront par relais, avec une estimation de fin ici.</Upcoming>
+
             </>
           )}
 
@@ -215,6 +235,7 @@ export function NewCampaign() {
                 <li><Icon name="check" size={16} /> {num(count)} contacts dans {chosen.length} liste{chosen.length > 1 ? 's' : ''}</li>
                 <li><Icon name="check" size={16} /> Envoi par {relayLabel(messenger)}, signé {senderName(sender)}</li>
                 <li><Icon name="check" size={16} /> {start === 'now' ? 'Départ immédiat' : start === 'scheduled' ? `Départ le ${new Date(sendAt).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' })}` : 'Reste en brouillon'}</li>
+                {estimate?.end && start !== 'draft' && <li><Icon name="clock" size={16} /> Fin estimée {fmtEnd(estimate.end)}, sur {estimate.days} jour{estimate.days > 1 ? 's' : ''} d’envoi</li>}
               </ul>
               {problems.length > 0 && (
                 <ul className="problems">
@@ -243,6 +264,20 @@ export function NewCampaign() {
             <p className="eyebrow">Destinataires</p>
             <p className="estimate-big num">{num(count)}</p>
             <p className="small">{chosen.length ? chosen.map((l) => l.name).join(', ') : 'Aucune liste choisie'}</p>
+            {count > 0 && (
+              <>
+                <hr />
+                {estimate ? (
+                  <>
+                    <p className="small">Avec <span className="strong">{relayLabel(messenger)}</span> ({cadenceSummary(relay!.cadence, relay!.warmup)}) :</p>
+                    <p className="estimate-end">{estimate.end ? `Fin ${fmtEnd(estimate.end)}` : 'Plus de quatre mois d’envoi'}</p>
+                    <p className="muted small num">sur {estimate.days} jour{estimate.days > 1 ? 's' : ''} d’envoi</p>
+                  </>
+                ) : (
+                  <p className="small muted">{relayLabel(messenger)} n’a pas de cadence propre : envoi au rythme global de l’instance.</p>
+                )}
+              </>
+            )}
           </section>
           <section className="panel preview">
             <p className="eyebrow">Aperçu avec un contact d’exemple</p>
