@@ -242,3 +242,24 @@ export interface RelayInput {
   warmup: RelayWarmup;
   system: boolean;
 }
+
+export type TemplateType = 'campaign' | 'campaign_visual' | 'tx';
+
+export interface Template {
+  id: number;
+  name: string;
+  type: TemplateType;
+  subject: string;
+  body?: string;
+  body_source?: string | null;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TemplateInput {
+  name: string;
+  type: TemplateType;
+  subject: string;
+  body: string;
+}

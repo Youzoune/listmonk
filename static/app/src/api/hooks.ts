@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, query } from './client';
 import type {
   Campaign, CampaignStatus, DashboardCharts, DashboardCounts, List, NewCampaign, Page, Profile, Project,
-  ProjectInput, Relay, RelayInput, ServerConfig, Settings, SmtpServer, Subscriber, User,
+  ProjectInput, Relay, RelayInput, ServerConfig, Settings, SmtpServer, Subscriber, Template, TemplateInput, User,
 } from './types';
 
 // Query keys start with the project so that switching project refetches everything.
@@ -181,5 +181,31 @@ export function useSaveRelay(project: number | null) {
       api<true | { needs_restart: boolean }>(`/api/relays/${uuid}`, { method: 'PUT', json: relay }),
     // Give the server a moment to reload before reading the relays again.
     onSuccess: () => setTimeout(() => qc.invalidateQueries({ queryKey: key(project, 'relays') }), 1500),
+  });
+}
+
+export function useTemplates(project: number | null) {
+  return useQuery({ queryKey: key(project, 'templates'), queryFn: () => api<Template[]>('/api/templates?no_body=true') });
+}
+
+export function useTemplate(project: number | null, id: number | null) {
+  return useQuery({ queryKey: key(project, 'template', id), queryFn: () => api<Template>(`/api/templates/${id}`), enabled: !!id });
+}
+
+export function useSaveTemplate(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, tpl }: { id?: number; tpl: TemplateInput }) =>
+      id ? api<Template>(`/api/templates/${id}`, { method: 'PUT', json: tpl }) : api<Template>('/api/templates', { method: 'POST', json: tpl }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
+  });
+}
+
+export function useTemplateAction(project: number | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, action }: { id: number; action: 'default' | 'delete' }) =>
+      action === 'delete' ? api<boolean>(`/api/templates/${id}`, { method: 'DELETE' }) : api<unknown>(`/api/templates/${id}/default`, { method: 'PUT' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(project) }),
   });
 }

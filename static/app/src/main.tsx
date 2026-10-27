@@ -19,6 +19,7 @@ import { ProjectEdit } from './views/ProjectEdit';
 import { Projects } from './views/Projects';
 import { Relays } from './views/Relays';
 import { Settings } from './views/Settings';
+import { TemplateEdit, Templates } from './views/Templates';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,6 +54,9 @@ const router = createBrowserRouter(
         { path: 'projets', element: <Projects /> },
         { path: 'projets/nouveau', element: <ProjectEdit /> },
         { path: 'projets/:id', element: <ProjectEdit /> },
+        { path: 'modeles', element: <Templates /> },
+        { path: 'modeles/nouveau', element: <TemplateEdit /> },
+        { path: 'modeles/:id', element: <TemplateEdit /> },
         { path: 'reglages', element: <Settings /> },
         { path: 'guide', element: <Guide /> },
         { path: 'marque', element: <Brand /> },
