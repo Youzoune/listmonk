@@ -21,6 +21,8 @@ function nextHour() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:00`;
 }
 
+const isEmail = (m: string) => m === 'email' || m.startsWith('email-');
+
 export function NewCampaign() {
   const { project, can } = useProject();
   const navigate = useNavigate();
@@ -109,6 +111,8 @@ export function NewCampaign() {
 
   const relayList = (relays.data ?? []).filter((r) => r.enabled && config.data.messengers.includes(r.name));
   const relay = relayList.find((r) => r.name === messenger);
+  // Postback channels (Réglages › Autres canaux) come after the SMTP relays.
+  const channels = config.data.messengers.filter((m) => !isEmail(m));
   const relayLabel = (m: string) => relayName({ name: m, pool: m === 'email' });
   const startAt = start === 'scheduled' ? new Date(sendAt) : new Date();
   const estimate = relay && hasCadence(relay.cadence, relay.warmup) && count > 0
@@ -190,7 +194,7 @@ export function NewCampaign() {
             <>
               <h2>Par quel relais, et quand ?</h2>
               <div className="choice-list">
-                {(relayList.length ? relayList.map((r) => r.name) : config.data.messengers).map((m) => {
+                {[...(relayList.length ? relayList.map((r) => r.name) : config.data.messengers.filter(isEmail)), ...channels].map((m) => {
                   const r = relayList.find((x) => x.name === m);
                   const left = r?.status && r.status.limit_today > 0 ? Math.max(0, r.status.limit_today - r.status.sent_today) : null;
                   return (
@@ -199,7 +203,7 @@ export function NewCampaign() {
                       <span className="choice-body">
                         <span className="strong">{relayLabel(m)}</span>
                         <span className="sub">
-                          {m === 'email' ? 'Répartit les envois sur les serveurs SMTP partagés' : r ? cadenceSummary(r.cadence, r.warmup) : 'Serveur SMTP dédié'}
+                          {m === 'email' ? 'Répartit les envois sur les serveurs SMTP partagés' : r ? cadenceSummary(r.cadence, r.warmup) : isEmail(m) ? 'Serveur SMTP dédié' : 'Autre canal (SMS, messagerie…)'}
                           {r && r.project_id !== 0 ? ' · réservé à ce projet' : ''}
                         </span>
                       </span>

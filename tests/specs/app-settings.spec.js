@@ -170,4 +170,28 @@ test.describe('Relais settings', () => {
     await expect(page.locator('.save-bar')).toContainText('Enregistré', { timeout: 20000 });
     expect((await (await page.request.get('/api/settings')).json()).data.messengers).toEqual([]);
   });
+
+  test('saves domains, language, appearance and performance settings', async ({ page }) => {
+    await page.goto(`${URL}?onglet=confidentialite`);
+    await page.getByLabel('Domaines refusés').fill('yopmail.com\n*.jetable.org');
+    await page.getByRole('tab', { name: 'Général' }).click();
+    await page.getByLabel('Langue des pages publiques et des e-mails système').selectOption('fr');
+    await page.getByRole('tab', { name: 'Apparence' }).click();
+    await page.getByLabel('CSS personnalisé').fill('.button { background: #0b5; }');
+    await page.getByRole('tab', { name: 'Performances' }).click();
+    await page.getByLabel('Nettoyer la base de données régulièrement (VACUUM)').check();
+    await page.getByLabel('Horaire du nettoyage').fill('0 4 * * 0');
+    await page.getByRole('button', { name: 'Enregistrer' }).click();
+    await expect(page.locator('.save-bar')).toContainText('Enregistré', { timeout: 20000 });
+
+    const s = (await (await page.request.get('/api/settings')).json()).data;
+    expect(s['privacy.domain_blocklist']).toEqual(['yopmail.com', '*.jetable.org']);
+    expect(s['app.lang']).toBe('fr');
+    expect(s['appearance.public.custom_css']).toBe('.button { background: #0b5; }');
+    expect(s['maintenance.db']).toEqual({ vacuum: true, vacuum_cron_interval: '0 4 * * 0' });
+
+    // A refused domain can't be added.
+    const r = await page.request.post('/api/subscribers', { data: { email: 'x@yopmail.com', name: 'X', status: 'enabled', lists: [] } });
+    expect(r.ok()).toBe(false);
+  });
 });

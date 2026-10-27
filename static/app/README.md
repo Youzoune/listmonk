@@ -39,17 +39,16 @@ cd tests && bun playwright test specs/app.spec.js   # parcours e2e sur /app
 | Écran | Adresse |
 |---|---|
 | Aujourd'hui, Campagnes, Nouvelle campagne | `/`, `/campagnes`, `/campagnes/nouvelle` |
-| Fiche campagne : contenu, aperçu, test, lancement, pause, programmation, duplication, statistiques | `/campagnes/:id` |
-| Audience, fiche contact, import CSV, listes, rebonds, formulaire d'inscription | `/audience`, `/audience/:id`, `/audience/import`, `/listes`, `/rebonds`, `/formulaire` |
+| Fiche campagne : contenu avec mise en forme (gras, liens, titres, listes, images), aperçu, test, lancement, pause, programmation, duplication, statistiques | `/campagnes/:id` |
+| Audience (recherche, recherche SQL, export CSV), fiche contact, import CSV, listes, rebonds, formulaire d'inscription | `/audience`, `/audience/:id`, `/audience/import`, `/listes`, `/rebonds`, `/formulaire` |
 | Modèles (code HTML et aperçu en direct), médias | `/modeles`, `/medias` |
 | Relais d'envoi, Projets, Guide de l'envoi, Identité | `/relais`, `/projets`, `/guide`, `/marque` |
-| Équipe : utilisateurs et rôles | `/equipe` |
-| Réglages : général, SMTP (préréglages OVH, Google, Microsoft, Brevo…), vitesse, confidentialité, sécurité, rebonds, médias | `/reglages` |
+| Équipe : utilisateurs, rôles et rôles sur les listes | `/equipe` |
+| Réglages : général, SMTP (préréglages OVH, Google, Microsoft, Brevo…), vitesse, confidentialité et domaines, sécurité et OIDC, rebonds (boîte POP3, webhooks des prestataires), médias, autres canaux, apparence, performances | `/reglages` |
 | Maintenance : nettoyage, journal du serveur | `/maintenance` |
 
 * Après connexion on arrive sur `/app`. La page de connexion reste celle du serveur (`/admin/login`) : elle gère déjà
   la double authentification et OIDC.
 * Les mots de passe enregistrés ne repartent jamais vers le navigateur : un champ vide garde le mot de passe existant.
-* Encore seulement dans l'ancienne interface (`/admin`) : la configuration OIDC, les boîtes de rebond (POP/IMAP) et
-  les webhooks des fournisseurs, les messagers externes (postback), les permissions par liste dans les rôles, les
-  modèles visuels et l'éditeur riche, la recherche SQL avancée et l'export des contacts.
+* Encore seulement dans l'ancienne interface (`/admin`) : les modèles visuels (éditeur par blocs) et le CSS de l'ancienne
+  interface elle-même. Une campagne écrite ailleurs avec une mise en forme que Relais ne sait pas relire s'édite en HTML.

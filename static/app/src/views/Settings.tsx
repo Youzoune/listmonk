@@ -17,6 +17,8 @@ const TABS = [
   { id: 'rebonds', label: 'Rebonds' },
   { id: 'medias', label: 'Stockage des médias' },
   { id: 'messagers', label: 'Autres canaux' },
+  { id: 'apparence', label: 'Apparence' },
+  { id: 'performances', label: 'Performances' },
 ] as const;
 type Tab = typeof TABS[number]['id'];
 
@@ -52,6 +54,9 @@ function Num({ id, label, value, onChange, unit, min = 0, hint, disabled }:
     </div>
   );
 }
+
+const LANGS = [['fr', 'Français'], ['fr-CA', 'Français (Canada)'], ['en', 'English'], ['es', 'Español'], ['de', 'Deutsch'], ['it', 'Italiano'],
+  ['pt', 'Português'], ['nl', 'Nederlands'], ['ar', 'العربية'], ['tr', 'Türkçe']] as const;
 
 function General({ s, set, canEdit }: { s: SettingsData; set: Patch; canEdit: boolean }) {
   const { project } = useProject();
@@ -90,8 +95,20 @@ function General({ s, set, canEdit }: { s: SettingsData; set: Patch; canEdit: bo
         onChange={(v) => set({ 'app.enable_public_subscription_page': v })} hint="Un formulaire hébergé par Relais pour s’inscrire aux listes publiques de chaque projet." />
       <Toggle id="pub-archive" label="Archive publique des campagnes" checked={!!s['app.enable_public_archive']} disabled={!canEdit}
         onChange={(v) => set({ 'app.enable_public_archive': v })} hint="Les campagnes marquées « archivées » restent lisibles en ligne, avec un flux RSS." />
+      {s['app.enable_public_archive'] && (
+        <Toggle id="rss-content" label="Texte complet des campagnes dans le flux RSS" checked={!!s['app.enable_public_archive_rss_content']} disabled={!canEdit}
+          onChange={(v) => set({ 'app.enable_public_archive_rss_content': v })} hint="Sinon le flux ne donne que le titre et le lien." />
+      )}
       <Toggle id="optin-confirm" label="Envoyer l’e-mail de confirmation d’inscription" checked={!!s['app.send_optin_confirmation']} disabled={!canEdit}
         onChange={(v) => set({ 'app.send_optin_confirmation': v })} hint="Pour les listes en double confirmation : la personne clique sur un lien pour confirmer." />
+      <Toggle id="optin-page" label="Page de confirmation avant l’inscription" checked={!!s['app.show_optin_page']} disabled={!canEdit}
+        onChange={(v) => set({ 'app.show_optin_page': v })} hint="Le lien de l’e-mail ouvre une page avec un bouton « Confirmer » : les antivirus qui ouvrent les liens ne confirment pas à la place de la personne." />
+      <Field id="app-lang" label="Langue des pages publiques et des e-mails système" hint="Inscription, désinscription, confirmation, alertes.">
+        <select id="app-lang" value={s['app.lang'] ?? 'fr'} disabled={!canEdit} onChange={(e) => set({ 'app.lang': e.target.value })}>
+          {LANGS.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+          {!LANGS.some(([c]) => c === s['app.lang']) && s['app.lang'] && <option value={s['app.lang']}>{s['app.lang']}</option>}
+        </select>
+      </Field>
     </section>
   );
 }
@@ -325,6 +342,9 @@ function Sending({ s, set, canEdit }: { s: SettingsData; set: Patch; canEdit: bo
   );
 }
 
+const EXPORTABLE = [['profile', 'Fiche (nom, adresse, attributs)'], ['subscriptions', 'Abonnements aux listes'],
+  ['campaign_views', 'Ouvertures des campagnes'], ['link_clicks', 'Clics sur les liens']] as const;
+
 function Privacy({ s, set, canEdit }: { s: SettingsData; set: Patch; canEdit: boolean }) {
   const t = (k: keyof SettingsData, id: string, label: string, hint: string) => (
     <Toggle id={id} label={label} hint={hint} checked={!!s[k]} disabled={!canEdit} onChange={(v) => set({ [k]: v } as Partial<SettingsData>)} />
@@ -344,6 +364,29 @@ function Privacy({ s, set, canEdit }: { s: SettingsData; set: Patch; canEdit: bo
       {t('privacy.allow_export', 'allow-export', 'Télécharger leurs données', 'Ce que le projet sait d’eux (RGPD).')}
       {t('privacy.allow_wipe', 'allow-wipe', 'Effacer leurs données', 'Supprimer leur fiche du projet (RGPD).')}
       {t('privacy.record_optin_ip', 'optin-ip', 'Enregistrer l’adresse IP à la confirmation', 'Une preuve du consentement en cas de contrôle.')}
+      {s['privacy.allow_export'] && (
+        <fieldset className="perm-group">
+          <legend>Données incluses dans le téléchargement</legend>
+          {EXPORTABLE.map(([k, label]) => (
+            <label key={k} className="switch" htmlFor={`exp-${k}`}>
+              <input id={`exp-${k}`} type="checkbox" disabled={!canEdit} checked={(s['privacy.exportable'] ?? []).includes(k)}
+                onChange={(e) => set({ 'privacy.exportable': e.target.checked ? [...(s['privacy.exportable'] ?? []), k] : (s['privacy.exportable'] ?? []).filter((x) => x !== k) })} />
+              <span>{label}</span>
+            </label>
+          ))}
+        </fieldset>
+      )}
+      <h3>Domaines d’adresses</h3>
+      <div className="grid-2">
+        <Field id="dom-block" label="Domaines refusés" hint="Un par ligne, par exemple yopmail.com. Ces adresses ne peuvent ni s’inscrire ni être importées. *.exemple.fr couvre les sous-domaines.">
+          <textarea id="dom-block" rows={4} className="mono" value={lines(s['privacy.domain_blocklist'])} disabled={!canEdit}
+            onChange={(e) => set({ 'privacy.domain_blocklist': fromLines(e.target.value) })} />
+        </Field>
+        <Field id="dom-allow" label="Seuls domaines acceptés (facultatif)" hint="Un par ligne. Rempli, seules ces adresses peuvent s’inscrire ou être importées : pratique pour une liste interne.">
+          <textarea id="dom-allow" rows={4} className="mono" value={lines(s['privacy.domain_allowlist'])} disabled={!canEdit}
+            onChange={(e) => set({ 'privacy.domain_allowlist': fromLines(e.target.value) })} />
+        </Field>
+      </div>
     </section>
   );
 }
@@ -614,6 +657,59 @@ function BounceWebhooks({ s, set, canEdit }: { s: SettingsData; set: Patch; canE
   );
 }
 
+// Custom CSS and JavaScript of the public pages.
+function Appearance({ s, set, canEdit }: { s: SettingsData; set: Patch; canEdit: boolean }) {
+  return (
+    <section className="panel settings-panel">
+      <h2>Apparence des pages publiques</h2>
+      <p className="small muted">
+        Pour les pages d’inscription, de désinscription, de préférences et l’archive, sur tous les projets. Le logo se règle dans Général.
+      </p>
+      <Field id="pub-css" label="CSS personnalisé" hint="Par exemple .button { background: #0b5; } pour la couleur des boutons.">
+        <textarea id="pub-css" rows={10} className="mono code-area" spellCheck={false} value={s['appearance.public.custom_css'] ?? ''} disabled={!canEdit}
+          onChange={(e) => set({ 'appearance.public.custom_css': e.target.value })} />
+      </Field>
+      <Field id="pub-js" label="JavaScript personnalisé" hint="Exécuté sur chaque page publique : une mesure d’audience respectueuse, par exemple. À manier avec prudence.">
+        <textarea id="pub-js" rows={6} className="mono code-area" spellCheck={false} value={s['appearance.public.custom_js'] ?? ''} disabled={!canEdit}
+          onChange={(e) => set({ 'appearance.public.custom_js': e.target.value })} />
+      </Field>
+    </section>
+  );
+}
+
+// Database housekeeping and the cache of the heavy dashboard queries.
+function Performance({ s, set, canEdit }: { s: SettingsData; set: Patch; canEdit: boolean }) {
+  const db = s['maintenance.db'] ?? { vacuum: false, vacuum_cron_interval: '0 2 * * *' };
+  return (
+    <section className="panel settings-panel">
+      <h2>Performances</h2>
+      <Explain title="Quand y toucher">
+        <p>
+          Rien à changer tant que l’instance a moins de quelques centaines de milliers de contacts. Au-delà, le tableau de bord et les
+          compteurs des listes peuvent ralentir : la mise en cache les calcule une fois par nuit.
+        </p>
+        <p>Les horaires s’écrivent au format cron : <span className="mono">0 3 * * *</span> veut dire tous les jours à 3 h.</p>
+      </Explain>
+      <Toggle id="cache-slow" label="Mettre en cache les compteurs lents" checked={!!s['app.cache_slow_queries']} disabled={!canEdit}
+        onChange={(v) => set({ 'app.cache_slow_queries': v })} hint="Les nombres de contacts et les statistiques du tableau de bord sont recalculés à l’horaire ci-dessous, pas à chaque visite." />
+      {s['app.cache_slow_queries'] && (
+        <Field id="cache-cron" label="Recalcul des compteurs">
+          <input id="cache-cron" type="text" className="mono" value={s['app.cache_slow_queries_interval'] ?? ''} disabled={!canEdit}
+            onChange={(e) => set({ 'app.cache_slow_queries_interval': e.target.value })} />
+        </Field>
+      )}
+      <Toggle id="vacuum" label="Nettoyer la base de données régulièrement (VACUUM)" checked={db.vacuum} disabled={!canEdit}
+        onChange={(v) => set({ 'maintenance.db': { ...db, vacuum: v } })} hint="Récupère la place laissée par les contacts et statistiques supprimés." />
+      {db.vacuum && (
+        <Field id="vacuum-cron" label="Horaire du nettoyage">
+          <input id="vacuum-cron" type="text" className="mono" value={db.vacuum_cron_interval} disabled={!canEdit}
+            onChange={(e) => set({ 'maintenance.db': { ...db, vacuum_cron_interval: e.target.value } })} />
+        </Field>
+      )}
+    </section>
+  );
+}
+
 const NEW_MESSENGER: Messenger = { enabled: true, name: '', root_url: '', username: '', password: '', max_conns: 5, timeout: '5s', max_msg_retries: 2 };
 
 // Postback messengers: listmonk posts each message to an address (SMS, WhatsApp, push…).
@@ -691,6 +787,15 @@ function MediaStorage({ s, set, canEdit }: { s: SettingsData; set: Patch; canEdi
             {text('upload.s3.aws_secret_access_key', 's3-secret', 'Clé secrète', 'Laissez vide pour garder la clé enregistrée.', 'password')}
           </div>
           {text('upload.s3.public_url', 's3-public', 'Adresse publique des fichiers (facultatif)', 'Si les fichiers sont servis par un autre domaine (CDN).')}
+          <div className="grid-2">
+            <Field id="s3-type" label="Accès au bucket">
+              <select id="s3-type" value={s['upload.s3.bucket_type'] ?? 'public'} disabled={!canEdit} onChange={(e) => set({ 'upload.s3.bucket_type': e.target.value })}>
+                <option value="public">Public : les fichiers ont une adresse fixe</option>
+                <option value="private">Privé : adresses signées, valables un temps</option>
+              </select>
+            </Field>
+            {s['upload.s3.bucket_type'] === 'private' && text('upload.s3.expiry', 's3-expiry', 'Validité des adresses signées', 'Par exemple 168h (7 jours). Les images des e-mails anciens ne s’affichent plus après.')}
+          </div>
         </>
       ) : (
         <div className="grid-2">
@@ -780,6 +885,8 @@ export function Settings() {
           {tab === 'rebonds' && <BounceRules s={draft} set={set} canEdit={canEdit} />}
           {tab === 'medias' && <MediaStorage s={draft} set={set} canEdit={canEdit} />}
           {tab === 'messagers' && <Messengers s={draft} set={set} canEdit={canEdit} />}
+          {tab === 'apparence' && <Appearance s={draft} set={set} canEdit={canEdit} />}
+          {tab === 'performances' && <Performance s={draft} set={set} canEdit={canEdit} />}
         </>
       )}
 

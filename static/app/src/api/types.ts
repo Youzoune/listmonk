@@ -155,6 +155,16 @@ export interface Settings {
   'app.enable_public_archive': boolean;
   'app.send_optin_confirmation': boolean;
   'app.check_updates': boolean;
+  'app.show_optin_page': boolean;
+  'app.enable_public_archive_rss_content': boolean;
+  'app.cache_slow_queries': boolean;
+  'app.cache_slow_queries_interval': string;
+  'privacy.exportable': string[];
+  'privacy.domain_blocklist': string[];
+  'privacy.domain_allowlist': string[];
+  'maintenance.db': { vacuum: boolean; vacuum_cron_interval: string };
+  'appearance.public.custom_css': string;
+  'appearance.public.custom_js': string;
   'app.batch_size': number;
   'app.concurrency': number;
   'app.max_send_errors': number;
@@ -191,6 +201,7 @@ export interface Settings {
   'upload.s3.bucket': string;
   'upload.s3.bucket_path': string;
   'upload.s3.bucket_type': string;
+  'upload.s3.expiry': string;
   'bounce.enabled': boolean;
   'bounce.webhooks_enabled': boolean;
   'bounce.actions': Record<'soft' | 'hard' | 'complaint', { count: number; action: 'none' | 'unsubscribe' | 'blocklist' | 'delete' }>;
