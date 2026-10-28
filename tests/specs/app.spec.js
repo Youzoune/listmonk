@@ -146,4 +146,39 @@ test.describe('Relais app', () => {
     await expect(page.getByRole('link', { name: /Mon compte/ })).toBeInViewport();
     await expect(page.getByRole('link', { name: 'Guide de l’envoi' })).toBeInViewport();
   });
+
+  test('stays readable in dark mode, without glaring white blocks', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    for (const url of [APP, `${APP}/campagnes`, `${APP}/relais`, `${APP}/reglages`]) {
+      await page.goto(url);
+      await expect(page.locator('.nav a[aria-current="page"]')).toBeVisible();
+      const bad = await page.evaluate(() => {
+        const rgb = (c) => (c.match(/[\d.]+/g) || []).map(Number);
+        const lum = ([r, g, b]) => {
+          const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+          return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+        };
+        const bgOf = (el) => {
+          for (let e = el; e; e = e.parentElement) {
+            const c = rgb(getComputedStyle(e).backgroundColor);
+            if (c.length === 3 || c[3] > 0.5) return c.slice(0, 3);
+          }
+          return rgb(getComputedStyle(document.body).backgroundColor).slice(0, 3);
+        };
+        const out = [];
+        for (const el of document.querySelectorAll('button, a, .chip, .alert')) {
+          const r = el.getBoundingClientRect();
+          if (!r.width || !r.height || el.disabled || el.closest('[disabled]')) continue;
+          const fg = lum(rgb(getComputedStyle(el).color));
+          const bg = lum(bgOf(el));
+          const ratio = (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
+          const text = el.textContent.trim().slice(0, 40);
+          if (ratio < 4.5) out.push(`${text}: contraste ${ratio.toFixed(2)}`);
+          if (bg > 0.6 && !el.classList.contains('btn-primary')) out.push(`${text}: fond clair en mode sombre`);
+        }
+        return out;
+      });
+      expect(bad, url).toEqual([]);
+    }
+  });
 });

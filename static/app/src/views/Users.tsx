@@ -228,8 +228,8 @@ export function Users() {
       </header>
 
       <div className="segmented" role="tablist" aria-label="Utilisateurs et rôles">
-        <button type="button" role="tab" aria-selected={tab === 'users'} aria-pressed={tab === 'users'} onClick={() => setParams({})}>Utilisateurs</button>
-        <button type="button" role="tab" aria-selected={tab === 'roles'} aria-pressed={tab === 'roles'} onClick={() => setParams({ onglet: 'roles' })}>Rôles</button>
+        <button type="button" role="tab" aria-selected={tab === 'users'} onClick={() => setParams({})}>Utilisateurs</button>
+        <button type="button" role="tab" aria-selected={tab === 'roles'} onClick={() => setParams({ onglet: 'roles' })}>Rôles</button>
       </div>
 
       {tab === 'users' && (
