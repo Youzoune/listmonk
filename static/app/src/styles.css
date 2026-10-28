@@ -558,3 +558,4 @@ input[aria-invalid="true"] { border-color: var(--bad); }
 .member-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .member-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r-sm); }
 .status-dot.bad { background: var(--bad); }
+.alert-info { background: var(--info-soft); color: var(--info); }

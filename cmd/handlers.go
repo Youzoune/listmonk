@@ -205,6 +205,11 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 			pm(middleware.GzipWithConfig(middleware.GzipConfig{Level: 9})(a.ExportSubscribers), auth.PermSubscribersGetAll, auth.PermSubscribersGet))
 
 		g.GET("/api/import/subscribers", pm(a.GetImportSubscribers, auth.PermSubscribersImport))
+
+		// Importing another listmonk instance (cmd/migrate.go).
+		g.POST("/api/import/listmonk/check", pm(a.CheckListmonkImport, auth.PermSettingsManage))
+		g.POST("/api/import/listmonk", pm(a.StartListmonkImport, auth.PermSettingsManage))
+		g.GET("/api/import/listmonk", pm(a.GetListmonkImport, auth.PermSettingsManage))
 		g.GET("/api/import/subscribers/logs", pm(a.GetImportSubscriberStats, auth.PermSubscribersImport))
 		g.POST("/api/import/subscribers", pm(a.ImportSubscribers, auth.PermSubscribersImport))
 		g.DELETE("/api/import/subscribers", pm(a.StopImportSubscribers, auth.PermSubscribersImport))

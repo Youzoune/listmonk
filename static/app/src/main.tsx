@@ -13,6 +13,7 @@ import { Audience } from './views/Audience';
 import { Bounces } from './views/Bounces';
 import { Maintenance } from './views/Maintenance';
 import { Account } from './views/Account';
+import { ListmonkImport } from './views/ListmonkImport';
 import { MediaLibrary } from './views/MediaLibrary';
 import { Users } from './views/Users';
 import { Brand } from './views/Brand';
@@ -72,6 +73,7 @@ const router = createBrowserRouter(
         { path: 'equipe', element: <Users /> },
         { path: 'maintenance', element: <Maintenance /> },
         { path: 'compte', element: <Account /> },
+        { path: 'migration', element: <ListmonkImport /> },
         { path: 'relais', element: <Relays /> },
         { path: 'relais/nouveau', element: <NewRelay /> },
         { path: 'projets', element: <Projects /> },
