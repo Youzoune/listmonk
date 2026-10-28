@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 import { resetDB } from '../helpers.js';
 
 // "Importer depuis listmonk" (/app/migration). The instance under test is its
@@ -77,5 +78,28 @@ test.describe('Import from listmonk', () => {
     const r = await page.request.post('/api/import/listmonk/check', { data: { url: baseURL, username: user.username, token: 'faux' } });
     expect(r.status()).toBe(502);
     expect((await r.json()).message).toContain('accès refusé');
+  });
+
+  test('exports an instance from the browser and imports the file', async ({ page }) => {
+    const other = await data(await page.request.post('/api/projects', { data: { name: 'Copie fichier', slug: 'copie-fichier', description: '' } }));
+    await page.goto('/app/migration');
+    // The script shown on the screen, run on the source instance (here, itself).
+    const script = await page.locator('details pre').textContent();
+    const [download] = await Promise.all([page.waitForEvent('download'), page.evaluate(script)]);
+    const file = await download.path();
+
+    await page.goto('/app/migration');
+    await page.locator('#lm-file').setInputFiles({ name: 'export.json', mimeType: 'application/json', buffer: readFileSync(file) });
+    await expect(page.getByRole('status').filter({ hasText: 'Fichier lu' })).toBeVisible();
+    await page.getByLabel('Default list').selectOption({ label: 'Copie fichier' });
+    await page.getByLabel('Opt-in list').selectOption({ label: 'Copie fichier' });
+    await page.getByRole('button', { name: /^Importer 2 listes/ }).click();
+    const progress = page.getByRole('region', { name: 'Avancement de l’import' });
+    await expect(progress).toContainText('contacts importés', { timeout: 30000 });
+    await expect(progress).toContainText('Terminé', { timeout: 30000 });
+
+    const headers = { 'X-Listmonk-Project': String(other.id) };
+    expect((await data(await page.request.get('/api/subscribers?per_page=all', { headers }))).results).toHaveLength(2);
+    expect((await data(await page.request.get('/api/campaigns?per_page=all', { headers }))).results.length).toBeGreaterThan(0);
   });
 });

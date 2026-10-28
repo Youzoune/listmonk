@@ -208,6 +208,7 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 
 		// Importing another listmonk instance (cmd/migrate.go).
 		g.POST("/api/import/listmonk/check", pm(a.CheckListmonkImport, auth.PermSettingsManage))
+		g.POST("/api/import/listmonk/file", pm(a.UploadListmonkExport, auth.PermSettingsManage))
 		g.POST("/api/import/listmonk", pm(a.StartListmonkImport, auth.PermSettingsManage))
 		g.GET("/api/import/listmonk", pm(a.GetListmonkImport, auth.PermSettingsManage))
 		g.GET("/api/import/subscribers/logs", pm(a.GetImportSubscriberStats, auth.PermSubscribersImport))

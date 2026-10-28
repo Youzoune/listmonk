@@ -6,6 +6,7 @@ import { useSaveProject, useSaveSettings, useSettings } from '../api/hooks';
 import type { SmtpServer } from '../api/types';
 import { Chip, ErrorState, Explain, Field, Icon, Loading } from '../components/ui';
 import { num } from '../lib/format';
+import { LISTMONK_EXPORT_SCRIPT } from '../lib/listmonkExport';
 import { isStockTemplate, missingBrands, suggestProject } from '../lib/migration';
 import { slugify } from '../lib/projects';
 import { settingsForSave } from '../lib/settings';
@@ -19,7 +20,7 @@ interface OldCampaign { id: number; name: string; status: string; sent: number; 
 interface OldSmtp { name: string; enabled: boolean; host: string; port: number; auth_protocol: SmtpServer['auth_protocol']; username: string;
   tls_type: SmtpServer['tls_type']; tls_skip_verify: boolean; max_conns: number; idle_timeout: string; wait_timeout: string;
   max_msg_retries: number; msg_retry_delay: string; hello_hostname: string }
-interface Check { lists: OldList[]; subscribers: number; templates: OldTemplate[]; campaigns: OldCampaign[]; smtp: OldSmtp[] | null; smtp_error: string }
+interface Check { source?: string; lists: OldList[]; subscribers: number; templates: OldTemplate[]; campaigns: OldCampaign[]; smtp: OldSmtp[] | null; smtp_error: string }
 interface Run {
   running: boolean; step: string; counts: Record<string, number>; total_subscribers: number; errors: string[];
   started_at: string; finished_at: string | null;
@@ -48,6 +49,14 @@ export function ListmonkImport() {
   const saveProject = useSaveProject();
   const [src, setSrc] = useState<Source>({ url: 'https://', username: '', token: '' });
   const check = useMutation({ mutationFn: (s: Source) => api<Check>('/api/import/listmonk/check', { method: 'POST', json: s }) });
+  const upload = useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData();
+      form.append('file', file);
+      return api<Check>('/api/import/listmonk/file', { method: 'POST', body: form });
+    },
+  });
+  const [copied, setCopied] = useState(false);
   const [listTo, setListTo] = useState<Record<number, number>>({});
   const [tplTo, setTplTo] = useState<Record<number, number>>({});
   const [withCampaigns, setWithCampaigns] = useState(true);
@@ -55,17 +64,21 @@ export function ListmonkImport() {
     mutationFn: () => api<Run>('/api/import/listmonk', {
       method: 'POST',
       json: {
-        source: src,
+        source: fromFile ? { url: '', username: '', token: '' } : src,
+        from_file: fromFile,
         lists: Object.entries(listTo).map(([id, project_id]) => ({ id: Number(id), project_id })),
         templates: Object.entries(tplTo).map(([id, project_id]) => ({ id: Number(id), project_id })),
         campaigns: withCampaigns,
       },
     }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['listmonk-import'] }),
+    // Shows the new import at once, not the last one.
+    onSuccess: (r) => qc.setQueryData(['listmonk-import'], r),
   });
   const run = useImportRun(start.isSuccess);
   const r = run.data;
-  const data = check.data;
+  // The last of the two ways used: the API, or an export file.
+  const fromFile = !!upload.data && (upload.submittedAt > check.submittedAt);
+  const data = fromFile ? upload.data : check.data ?? upload.data;
 
   // Each list and template goes to the project of its brand by default.
   useEffect(() => {
@@ -127,6 +140,29 @@ export function ListmonkImport() {
           <button type="button" className="btn btn-dark" disabled={check.isPending || !src.url.startsWith('http') || !src.username || !src.token}
             onClick={() => check.mutate(src)}>{check.isPending ? 'Connexion…' : 'Se connecter et lire le contenu'}</button>
         </div>
+
+        <h3>Ou sans accès API : un fichier d’export</h3>
+        <ol className="steps-list small">
+          <li>Ouvrez l’ancienne instance (page d’administration) dans votre navigateur, connecté.</li>
+          <li>Ouvrez la console du navigateur (Cmd ⌥ J sur Mac, Ctrl Maj J sur Windows), collez le script et appuyez sur Entrée.</li>
+          <li>Un fichier <span className="mono">listmonk-export-….json</span> se télécharge : déposez-le ci-dessous.</li>
+        </ol>
+        <div className="row-gap">
+          <button type="button" className="btn btn-sm" onClick={async () => {
+            try { await navigator.clipboard.writeText(LISTMONK_EXPORT_SCRIPT); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* shown below */ }
+          }}>{copied ? 'Script copié' : 'Copier le script d’export'}</button>
+          <label className="btn btn-sm" htmlFor="lm-file">
+            {upload.isPending ? 'Lecture…' : 'Déposer le fichier d’export'}
+            <input id="lm-file" type="file" accept="application/json,.json" hidden onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) upload.mutate(f);
+              e.target.value = '';
+            }} />
+          </label>
+        </div>
+        <details className="small"><summary>Voir le script</summary><pre className="import-logs mono">{LISTMONK_EXPORT_SCRIPT}</pre></details>
+        {upload.isError && <ErrorState error={upload.error} />}
+        {upload.data && <p className="saved small" role="status"><Icon name="check" size={14} /> Fichier lu{upload.data.source ? ` : export de ${upload.data.source}` : ''}.</p>}
       </section>
 
       {data && (
@@ -199,7 +235,7 @@ export function ListmonkImport() {
         </section>
       )}
 
-      {r && <Progress run={r} />}
+      {start.isPending ? <section className="panel"><Loading label="Démarrage de l’import…" /></section> : r && <Progress run={r} />}
       {finished && data?.smtp && data.smtp.length > 0 && <SmtpImport servers={data.smtp} />}
       {data && !data.smtp && data.smtp_error && (
         <p className="small muted">Les serveurs d’envoi n’ont pas pu être lus ({data.smtp_error}) : donnez le droit « réglages » à l’utilisateur API pour les reprendre aussi.</p>

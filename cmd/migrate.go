@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +22,12 @@ import (
 // campaigns (as drafts). The data goes from server to server; the browser
 // only sends the plan and reads the progress. SMTP servers are listed by the
 // check, and the screen adds them (their passwords can't be read).
+
+// lmFetcher reads the other instance: through its API (lmSource) or from
+// an export file made in the browser (lmBundle).
+type lmFetcher interface {
+	get(path string, out any) error
+}
 
 // lmSource is the other instance and an API user of it.
 type lmSource struct {
@@ -158,7 +165,8 @@ type migrationRun struct {
 
 var migration = struct {
 	sync.Mutex
-	run *migrationRun
+	run    *migrationRun
+	bundle *lmBundle
 }{}
 
 func (m *migrationRun) note(err string) {
@@ -188,7 +196,15 @@ func (a *App) CheckListmonkImport(c *echo.Context) error {
 	if err := c.Bind(&src); err != nil {
 		return err
 	}
+	out, err := describeListmonk(src)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
+	}
+	return c.JSON(http.StatusOK, okResp{out})
+}
 
+// describeListmonk says what the other instance holds.
+func describeListmonk(src lmFetcher) (map[string]any, error) {
 	var (
 		lists struct {
 			Results []lmList `json:"results"`
@@ -202,16 +218,16 @@ func (a *App) CheckListmonkImport(c *echo.Context) error {
 		}
 	)
 	if err := src.get("/api/lists?per_page=all&minimal=false", &lists); err != nil {
-		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
+		return nil, err
 	}
 	if err := src.get("/api/subscribers?per_page=1", &subs); err != nil {
-		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
+		return nil, err
 	}
 	if err := src.get("/api/templates?no_body=true", &templates); err != nil {
-		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
+		return nil, err
 	}
 	if err := src.get("/api/campaigns?per_page=all&no_body=true", &campaigns); err != nil {
-		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
+		return nil, err
 	}
 
 	// The SMTP servers need settings:get on the other side: optional.
@@ -245,14 +261,14 @@ func (a *App) CheckListmonkImport(c *echo.Context) error {
 		ts = append(ts, map[string]any{"id": t.ID, "name": t.Name, "type": t.Type, "is_default": t.IsDefault})
 	}
 
-	return c.JSON(http.StatusOK, okResp{map[string]any{
+	return map[string]any{
 		"lists":       lists.Results,
 		"subscribers": subs.Total,
 		"templates":   ts,
 		"campaigns":   cs,
 		"smtp":        settings.SMTP,
 		"smtp_error":  smtpErr,
-	}})
+	}, nil
 }
 
 // planItem sends a list or a template of the other instance to a project
@@ -264,7 +280,9 @@ type planItem struct {
 
 // migrationPlan says where each list and template of the other instance goes.
 type migrationPlan struct {
-	Source    lmSource   `json:"source"`
+	Source lmSource `json:"source"`
+	// FromFile imports the export file uploaded last instead of calling the API.
+	FromFile  bool       `json:"from_file"`
 	Lists     []planItem `json:"lists"`
 	Templates []planItem `json:"templates"`
 	Campaigns bool       `json:"campaigns"`
@@ -276,7 +294,16 @@ func (a *App) StartListmonkImport(c *echo.Context) error {
 	if err := json.NewDecoder(c.Request().Body).Decode(&p); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	if _, err := p.Source.base(); err != nil {
+	var src lmFetcher = p.Source
+	if p.FromFile {
+		migration.Lock()
+		b := migration.bundle
+		migration.Unlock()
+		if b == nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "Aucun fichier d’export : envoyez-le d’abord.")
+		}
+		src = b
+	} else if _, err := p.Source.base(); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	projects := map[int]bool{}
@@ -299,7 +326,7 @@ func (a *App) StartListmonkImport(c *echo.Context) error {
 	migration.run = run
 	migration.Unlock()
 
-	go a.runListmonkImport(p, run)
+	go a.runListmonkImport(p, src, run)
 	return c.JSON(http.StatusOK, okResp{run})
 }
 
@@ -319,7 +346,7 @@ func (a *App) GetListmonkImport(c *echo.Context) error {
 	return c.JSON(http.StatusOK, okResp{out})
 }
 
-func (a *App) runListmonkImport(p migrationPlan, run *migrationRun) {
+func (a *App) runListmonkImport(p migrationPlan, src lmFetcher, run *migrationRun) {
 	defer func() {
 		if r := recover(); r != nil {
 			run.note(fmt.Sprintf("arrêt inattendu : %v", r))
@@ -335,7 +362,6 @@ func (a *App) runListmonkImport(p migrationPlan, run *migrationRun) {
 		a.log.Printf("listmonk import finished: %v", run.Counts)
 	}()
 
-	src := p.Source
 	target := map[int]int{}
 	for _, l := range p.Lists {
 		if l.ProjectID > 0 {
@@ -501,7 +527,7 @@ func (a *App) importSubscriber(s lmSubscriber, target, newList map[int]int, run 
 	}
 }
 
-func (a *App) importCampaigns(src lmSource, target, newList, newTpl, tplProject map[int]int, run *migrationRun) {
+func (a *App) importCampaigns(src lmFetcher, target, newList, newTpl, tplProject map[int]int, run *migrationRun) {
 	var res struct {
 		Results []lmCampaign `json:"results"`
 	}
@@ -587,4 +613,108 @@ func (a *App) importCampaigns(src lmSource, target, newList, newTpl, tplProject 
 		}
 		run.add("campaigns", 1)
 	}
+}
+
+// lmBundle is an export of a listmonk instance made in the browser by the
+// export script of the import screen: the API responses, saved as a file.
+type lmBundle struct {
+	Format      string            `json:"format"`
+	Source      string            `json:"source"`
+	Lists       []json.RawMessage `json:"lists"`
+	Subscribers []json.RawMessage `json:"subscribers"`
+	Templates   []json.RawMessage `json:"templates"`
+	Campaigns   []json.RawMessage `json:"campaigns"`
+	SMTP        []json.RawMessage `json:"smtp"`
+}
+
+const lmBundleFormat = "relais-listmonk-export/1"
+
+// get answers the API paths the import reads, from the file.
+func (b *lmBundle) get(path string, out any) error {
+	u, err := url.Parse(path)
+	if err != nil {
+		return err
+	}
+	q := u.Query()
+	var v any
+	switch {
+	case u.Path == "/api/lists":
+		v = map[string]any{"results": b.Lists}
+	case u.Path == "/api/subscribers":
+		per, _ := strconv.Atoi(q.Get("per_page"))
+		page, _ := strconv.Atoi(q.Get("page"))
+		if per < 1 {
+			per = len(b.Subscribers)
+		}
+		if page < 1 {
+			page = 1
+		}
+		from, to := (page-1)*per, page*per
+		if from > len(b.Subscribers) {
+			from = len(b.Subscribers)
+		}
+		if to > len(b.Subscribers) {
+			to = len(b.Subscribers)
+		}
+		v = map[string]any{"results": b.Subscribers[from:to], "total": len(b.Subscribers)}
+	case u.Path == "/api/templates":
+		v = b.Templates
+	case strings.HasPrefix(u.Path, "/api/templates/"):
+		id, _ := strconv.Atoi(strings.TrimPrefix(u.Path, "/api/templates/"))
+		for _, t := range b.Templates {
+			var x struct {
+				ID int `json:"id"`
+			}
+			if json.Unmarshal(t, &x) == nil && x.ID == id {
+				return json.Unmarshal(t, out)
+			}
+		}
+		return fmt.Errorf("modèle %d absent du fichier", id)
+	case u.Path == "/api/campaigns":
+		v = map[string]any{"results": b.Campaigns}
+	case u.Path == "/api/settings":
+		if b.SMTP == nil {
+			return errors.New("le fichier ne contient pas les serveurs d’envoi")
+		}
+		v = map[string]any{"smtp": b.SMTP}
+	default:
+		return fmt.Errorf("%s : absent du fichier", path)
+	}
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(raw, out)
+}
+
+// UploadListmonkExport reads an export file and describes its content, like
+// CheckListmonkImport does for an instance.
+func (a *App) UploadListmonkExport(c *echo.Context) error {
+	file, err := c.FormFile("file")
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Joignez le fichier d’export.")
+	}
+	f, err := file.Open()
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	var b lmBundle
+	if err := json.NewDecoder(io.LimitReader(f, 512<<20)).Decode(&b); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Fichier illisible : "+err.Error())
+	}
+	if b.Format != lmBundleFormat {
+		return echo.NewHTTPError(http.StatusBadRequest, "Ce n’est pas un export listmonk fait depuis Relais.")
+	}
+	out, err := describeListmonk(&b)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	out["source"] = b.Source
+
+	migration.Lock()
+	migration.bundle = &b
+	migration.Unlock()
+	return c.JSON(http.StatusOK, okResp{out})
 }
