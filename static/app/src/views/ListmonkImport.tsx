@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { api } from '../api/client';
 import { useSaveProject, useSaveSettings, useSettings } from '../api/hooks';
@@ -75,7 +75,11 @@ export function ListmonkImport() {
     onSuccess: (r) => qc.setQueryData(['listmonk-import'], r),
   });
   const run = useImportRun(start.isSuccess);
-  const r = run.data;
+  // Adding the SMTP servers restarts the server, which forgets the import:
+  // the screen keeps showing the last one it saw.
+  const lastRun = useRef<Run | null>(null);
+  if (run.data) lastRun.current = run.data;
+  const r = run.data ?? lastRun.current;
   // The last of the two ways used: the API, or an export file.
   const fromFile = !!upload.data && (upload.submittedAt > check.submittedAt);
   const data = fromFile ? upload.data : check.data ?? upload.data;

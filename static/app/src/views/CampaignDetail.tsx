@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { apiHTML } from '../api/client';
 import {
   useCampaign, useCampaignAnalytics, useCampaignStatus, useCloneCampaign, useDeleteCampaign, useLists, useSaveCampaign,
-  useServerConfig, useTemplates, useTestCampaign,
+  useRelays, useServerConfig, useTemplates, useTestCampaign,
 } from '../api/hooks';
 import type { AnalyticsCount, Campaign } from '../api/types';
 import { CampaignChip, ErrorState, Explain, Field, Icon, Loading, Progress } from '../components/ui';
@@ -11,6 +11,7 @@ import { campaignHTMLToText, textToCampaignHTML } from '../lib/body';
 import { FormatBar, FormatHelp } from '../components/FormatBar';
 import { ACTIONS, ACTION_LABEL, ACTION_STATUS, analyticsRange, isEditable, rate, type CampaignAction } from '../lib/campaigns';
 import { count, dateTime, num, relayLabel } from '../lib/format';
+import { relayName } from '../lib/relays';
 import { fromTemplate, toTemplate } from '../lib/variables';
 import { useProject } from '../project';
 
@@ -78,6 +79,7 @@ export function CampaignDetail() {
   const lists = useLists(project.id);
   const templates = useTemplates(project.id);
   const config = useServerConfig(project.id);
+  const relayQ = useRelays(project.id);
   const save = useSaveCampaign(project.id);
   const status = useCampaignStatus(project.id);
   const del = useDeleteCampaign(project.id);
@@ -86,7 +88,7 @@ export function CampaignDetail() {
   const range = camp.data ? analyticsRange(camp.data.created_at) : null;
   const analytics = useCampaignAnalytics(project.id, can('campaigns:get_analytics') ? cid : null, range);
 
-  const [draft, setDraft] = useState<{ name: string; subject: string; from: string; lists: number[]; templateId: number | null; text: string | null; html: string; archive: boolean } | null>(null);
+  const [draft, setDraft] = useState<{ name: string; subject: string; from: string; lists: number[]; templateId: number | null; text: string | null; html: string; archive: boolean; messenger: string } | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const [sendAt, setSendAt] = useState(nextHour);
   const [scheduling, setScheduling] = useState(false);
@@ -100,7 +102,7 @@ export function CampaignDetail() {
     const text = c.content_type === 'richtext' ? campaignHTMLToText(c.body) : null;
     setDraft({
       name: c.name, subject: fromTemplate(c.subject), from: c.from_email, lists: c.lists.map((l) => l.id),
-      templateId: c.template_id ?? null, text, html: c.body, archive: !!c.archive,
+      templateId: c.template_id ?? null, text, html: c.body, archive: !!c.archive, messenger: c.messenger || 'email',
     });
   }, [camp.data, draft]);
 
@@ -120,6 +122,7 @@ export function CampaignDetail() {
     template_id: draft?.templateId ?? c.template_id ?? null,
     body,
     archive: draft?.archive ?? c.archive,
+    messenger: draft?.messenger ?? c.messenger,
   });
 
   const problems = draft ? [
@@ -144,6 +147,10 @@ export function CampaignDetail() {
 
   const actions = ACTIONS[c.status].filter((a) => canSend || a === 'pause' || a === 'unschedule');
   const relays = (config.data?.messengers ?? []);
+  // Every relay of the project, turned off ones included (their password may come later).
+  const relayList = (relayQ.data ?? []).filter((r) => r.pool || (r.name && r.name !== 'email'));
+  const channels = relays.filter((m) => m !== 'email' && !m.startsWith('email-'));
+  const chosenRelay = relayList.find((r) => (r.pool ? 'email' : r.name) === (draft?.messenger ?? c.messenger));
   const campaignTemplates = (templates.data ?? []).filter((t) => t.type === 'campaign' || t.type === 'campaign_visual');
   const activeLists = (lists.data?.results ?? []).filter((l) => l.status === 'active' || draft?.lists.includes(l.id));
 
@@ -261,7 +268,25 @@ export function CampaignDetail() {
               <input id="c-archive" type="checkbox" checked={draft.archive} onChange={(e) => setDraft({ ...draft, archive: e.target.checked })} />
               <span>Publier dans l’archive publique du projet</span>
             </label>
-            {relays.length > 1 && <p className="small muted">Relais : {relayLabel(c.messenger)}. Pour en changer, dupliquez la campagne depuis la création.</p>}
+            <Field id="c-relay" label="Relais d’envoi">
+              <select id="c-relay" value={draft.messenger} onChange={(e) => setDraft({ ...draft, messenger: e.target.value })}>
+                {relayList.map((r) => (
+                  <option key={r.uuid || r.name} value={r.pool ? 'email' : r.name}>
+                    {relayName(r)}{!r.enabled ? ' (désactivé)' : r.example ? ' (aucun vrai serveur)' : ''}
+                  </option>
+                ))}
+                {channels.map((m) => <option key={m} value={m}>{m} (autre canal)</option>)}
+                {!relayList.some((r) => (r.pool ? 'email' : r.name) === draft.messenger) && !channels.includes(draft.messenger) && (
+                  <option value={draft.messenger}>{relayLabel(draft.messenger)} (introuvable)</option>
+                )}
+              </select>
+            </Field>
+            {chosenRelay && (!chosenRelay.enabled || chosenRelay.example) && (
+              <p className="field-error">
+                Ce relais ne peut pas envoyer pour l’instant ({chosenRelay.example ? 'serveurs d’exemple' : 'désactivé'}) : la campagne ne partira
+                qu’une fois son mot de passe saisi et le relais activé dans <Link className="link" to="/reglages?onglet=smtp">Réglages › Serveurs SMTP</Link>.
+              </p>
+            )}
             <div className="row-gap end">
               {save.isSuccess && <span className="saved" role="status"><Icon name="check" size={16} /> Enregistré</span>}
               <button type="button" className="btn btn-dark" disabled={save.isPending} onClick={() => save.mutate({ id: c.id, campaign: payload() })}>{save.isPending ? 'Enregistrement…' : 'Enregistrer'}</button>
