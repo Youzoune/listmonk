@@ -116,7 +116,7 @@ export function Maintenance() {
         </div>
         <p className="small muted">Les derniers messages de Relais : démarrages, envois, erreurs SMTP. Utile pour comprendre un envoi qui bloque.</p>
         {logs.isPending ? <Loading /> : logs.isError ? <ErrorState error={logs.error} /> : (
-          <pre className="import-logs mono server-logs">{(logs.data ?? []).slice(-200).join('\n')}</pre>
+          <pre className="import-logs mono server-logs" tabIndex={0} aria-label="Journal du serveur">{(logs.data ?? []).slice(-200).join('\n')}</pre>
         )}
       </section>
     </div>

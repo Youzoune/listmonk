@@ -86,13 +86,13 @@ export function Home() {
       {counts.isError ? <ErrorState error={counts.error} retry={() => counts.refetch()} /> : (
         <dl className="kpi-strip">
           <div><dt>Contacts</dt><dd className="num">{counts.data ? num(counts.data.subscribers.total) : '…'}</dd>
-            <span className="sub">{counts.data ? `${num(counts.data.subscribers.blocklisted)} en liste noire` : ''}</span></div>
+            <dd className="sub">{counts.data ? `${num(counts.data.subscribers.blocklisted)} en liste noire` : ''}</dd></div>
           <div><dt>Listes</dt><dd className="num">{counts.data ? num(counts.data.lists.total) : '…'}</dd>
-            <span className="sub">{counts.data ? `${count(counts.data.lists.public, 'publique')}, ${count(counts.data.lists.private, 'privée')}` : ''}</span></div>
+            <dd className="sub">{counts.data ? `${count(counts.data.lists.public, 'publique')}, ${count(counts.data.lists.private, 'privée')}` : ''}</dd></div>
           <div><dt>Campagnes</dt><dd className="num">{counts.data ? num(counts.data.campaigns.total) : '…'}</dd>
-            <span className="sub">{counts.data ? count(counts.data.campaigns.by_status.draft ?? 0, 'brouillon') : ''}</span></div>
+            <dd className="sub">{counts.data ? count(counts.data.campaigns.by_status.draft ?? 0, 'brouillon') : ''}</dd></div>
           <div><dt>E-mails envoyés</dt><dd className="num">{counts.data ? num(counts.data.messages) : '…'}</dd>
-            <span className="sub">depuis le début</span></div>
+            <dd className="sub">depuis le début</dd></div>
         </dl>
       )}
 
@@ -167,12 +167,12 @@ export function Home() {
               <div>
                 <dt>Ouvertures</dt>
                 <dd className="num">{num(sum(ch?.campaign_views))}</dd>
-                <Sparkline values={series(ch?.campaign_views)} label="Ouvertures par jour" />
+                <dd><Sparkline values={series(ch?.campaign_views)} label="Ouvertures par jour" /></dd>
               </div>
               <div>
                 <dt>Clics</dt>
                 <dd className="num">{num(sum(ch?.link_clicks))}</dd>
-                <Sparkline values={series(ch?.link_clicks)} label="Clics par jour" />
+                <dd><Sparkline values={series(ch?.link_clicks)} label="Clics par jour" /></dd>
               </div>
             </dl>
           )}

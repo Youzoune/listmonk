@@ -870,7 +870,7 @@ export function Settings() {
 
       <div className="segmented" role="tablist" aria-label="Rubriques des réglages">
         {TABS.map((t) => (
-          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} aria-pressed={tab === t.id} onClick={() => setParams({ onglet: t.id })}>{t.label}</button>
+          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => setParams({ onglet: t.id })}>{t.label}</button>
         ))}
       </div>
 
