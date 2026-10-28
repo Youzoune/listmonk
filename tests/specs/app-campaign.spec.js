@@ -95,4 +95,28 @@ test.describe('Relais campaign page', () => {
     const all = (await (await page.request.get('/api/campaigns?per_page=all')).json()).data.results;
     expect(all.map((c) => c.name)).not.toContain('Copie de Gazette');
   });
+
+  test('keeps a relay that is turned off and refuses to launch on it', async ({ page }) => {
+    // A relay set up but turned off: its password comes later.
+    const cur = (await (await page.request.get('/api/settings')).json()).data;
+    const clean = (v) => (typeof v === 'string' ? (/^•+$/.test(v) ? '' : v) : Array.isArray(v) ? v.map(clean)
+      : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, clean(x)])) : v);
+    const set = clean(cur);
+    set.smtp = [...set.smtp, { ...set.smtp[0], uuid: '', name: 'plus-tard', enabled: false, exclude_from_default: true }];
+    await page.request.put('/api/settings', { data: set });
+    await expect.poll(async () => (await (await page.request.get('/api/relays')).json()).data?.some((r) => r.name === 'email-plus-tard'), { timeout: 20000 }).toBe(true);
+
+    const c = (await (await page.request.post('/api/campaigns', { data: {
+      name: 'Relance', subject: 'Bonjour', lists: [1], content_type: 'richtext', body: '<p>Bonjour</p>', messenger: 'email',
+    } })).json()).data;
+    await page.goto(`/app/campagnes/${c.id}`);
+    await page.getByLabel('Relais d’envoi').selectOption({ label: 'plus-tard (désactivé)' });
+    await expect(page.getByText('Ce relais ne peut pas envoyer pour l’instant')).toBeVisible();
+    await page.getByRole('button', { name: 'Enregistrer' }).click();
+    await expect.poll(async () => (await (await page.request.get(`/api/campaigns/${c.id}`)).json()).data.messenger).toBe('email-plus-tard');
+
+    const r = await page.request.put(`/api/campaigns/${c.id}/status`, { data: { status: 'running' } });
+    expect(r.status()).toBe(400);
+    expect((await r.json()).message).toContain('« plus-tard » est désactivé');
+  });
 });

@@ -575,6 +575,19 @@ func (a *App) UpdateCampaignStatus(c *echo.Context) error {
 		return err
 	}
 
+	// A campaign can't start (or be scheduled) on a relay that is turned off.
+	if req.Status == models.CampaignStatusRunning || req.Status == models.CampaignStatusScheduled {
+		cur, err := a.core.GetCampaign(id, "", "")
+		if err != nil {
+			return err
+		}
+		if cur.Messenger != "" && !a.manager.HasMessenger(cur.Messenger) {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf(
+				"Le relais « %s » est désactivé : saisissez son mot de passe et activez-le (Réglages › Serveurs SMTP) avant de lancer la campagne.",
+				strings.TrimPrefix(cur.Messenger, "email-")))
+		}
+	}
+
 	// Update the campaign status in the DB.
 	out, err := a.core.UpdateCampaignStatus(id, req.Status)
 	if err != nil {
@@ -904,10 +917,12 @@ func (a *App) validateCampaignFields(c campReq) (campReq, error) {
 	}
 
 	if !a.manager.HasMessenger(c.Messenger) {
-		// If it's a specific SMTP, but it's no longer available (removed/disabled), fall back to general email messenger.
-		if strings.HasPrefix(c.Messenger, "email-") {
+		// A relay that is set up but turned off (its password not typed yet,
+		// say) stays on the draft: launching is refused until it's on.
+		// A relay that no longer exists falls back to the default one.
+		if strings.HasPrefix(c.Messenger, "email-") && !relayConfigured(c.Messenger) {
 			c.Messenger = email.MessengerName
-		} else {
+		} else if !strings.HasPrefix(c.Messenger, "email-") {
 			return c, errors.New(a.i18n.Ts("campaigns.fieldInvalidMessenger", "name", c.Messenger))
 		}
 	}

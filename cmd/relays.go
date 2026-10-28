@@ -296,3 +296,14 @@ func isExampleServer(host, username string) bool {
 	return h == "" || h == "smtp.yoursite.com" || strings.HasSuffix(h, ".yoursite.com") ||
 		u == "username" || u == "username@gmail.com"
 }
+
+// relayConfigured tells whether an SMTP relay exists in the settings, even
+// turned off.
+func relayConfigured(name string) bool {
+	for _, r := range smtpRelays(ko) {
+		if r.Name == name {
+			return true
+		}
+	}
+	return false
+}
