@@ -291,6 +291,11 @@ export interface Relay {
   cadence: RelayCadence;
   warmup: RelayWarmup;
   servers?: number;
+  // One of the installer's placeholder servers (smtp.yoursite.com…): sends nothing.
+  // On the default relay: none of its servers is real.
+  example?: boolean;
+  // The servers of the default relay.
+  members?: Relay[];
   status: RelayStatus | null;
 }
 

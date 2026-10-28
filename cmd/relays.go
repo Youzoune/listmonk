@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/knadh/koanf/v2"
@@ -27,6 +28,12 @@ type relayResp struct {
 	Cadence   models.RelayCadence `json:"cadence"`
 	Warmup    models.RelayWarmup  `json:"warmup"`
 	Servers   int                 `json:"servers,omitempty"`
+
+	// Example tells a server is one of the installer's placeholders
+	// (smtp.yoursite.com…): it can't send anything.
+	Example bool `json:"example"`
+	// Members are the servers of the default relay (the pool only).
+	Members []relayResp `json:"members,omitempty"`
 
 	Status *manager.RelayStatus `json:"status"`
 }
@@ -75,6 +82,7 @@ func smtpRelays(ko *koanf.Koanf) []relayResp {
 			continue
 		}
 		r.InPool = r.Enabled && !item.Bool("exclude_from_default") && r.ProjectID == 0
+		r.Example = isExampleServer(r.Host, item.String("username"))
 		out = append(out, r)
 	}
 	return out
@@ -138,10 +146,13 @@ func (a *App) GetRelays(c *echo.Context) error {
 	}
 
 	all := smtpRelays(ko)
-	pool := relayResp{Name: email.MessengerName, Pool: true, Enabled: true, System: system == email.MessengerName}
+	pool := relayResp{Name: email.MessengerName, Pool: true, Enabled: true, System: system == email.MessengerName, Example: true}
 	for _, r := range all {
 		if r.InPool {
 			pool.Servers++
+			pool.Members = append(pool.Members, r)
+			// The default relay can send as soon as one of its servers is real.
+			pool.Example = pool.Example && r.Example
 		}
 	}
 	if s, ok := statuses[pool.Name]; ok {
@@ -275,4 +286,13 @@ func (a *App) validateRelayCadence(c models.RelayCadence, w models.RelayWarmup) 
 	}
 
 	return nil
+}
+
+// isExampleServer tells the installer's placeholder SMTP servers (schema.sql)
+// from real ones, so that the app can say nothing can be sent yet.
+func isExampleServer(host, username string) bool {
+	h := strings.ToLower(strings.TrimSpace(host))
+	u := strings.ToLower(strings.TrimSpace(username))
+	return h == "" || h == "smtp.yoursite.com" || strings.HasSuffix(h, ".yoursite.com") ||
+		u == "username" || u == "username@gmail.com"
 }

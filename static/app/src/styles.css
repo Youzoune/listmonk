@@ -553,3 +553,8 @@ input[aria-invalid="true"] { border-color: var(--bad); }
   .nav a, .side-foot a { min-height: 38px; }
   .side-foot { gap: 4px; }
 }
+.alert-stack { flex-direction: column; align-items: flex-start; gap: 6px; }
+.alert-stack p { margin: 0; }
+.member-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.member-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r-sm); }
+.status-dot.bad { background: var(--bad); }

@@ -99,3 +99,11 @@ export function freeRelayName(base: string, servers: Pick<SmtpServer, 'name'>[])
   if (!taken.has(clean)) return clean;
   for (let i = 2; ; i++) if (!taken.has(`${clean}-${i}`)) return `${clean}-${i}`;
 }
+
+// The installer's placeholder servers (schema.sql): they can't send anything.
+// Same rule as the server (cmd/relays.go isExampleServer).
+export function isExampleServer(s: Pick<SmtpServer, 'host' | 'username'>): boolean {
+  const h = s.host.trim().toLowerCase();
+  const u = s.username.trim().toLowerCase();
+  return !h || h === 'smtp.yoursite.com' || h.endsWith('.yoursite.com') || u === 'username' || u === 'username@gmail.com';
+}

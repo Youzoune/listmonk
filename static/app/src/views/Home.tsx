@@ -36,6 +36,9 @@ export function Home() {
   // Relays worth a look today: those with a cadence of their own or that sent something.
   const busyRelays = (relays.data ?? []).filter((r) => r.enabled && r.status && (r.status.has_cadence || r.status.sent_today > 0));
 
+  // Nothing can leave while every server is one of the installer's examples.
+  const noRealServer = !!relays.data && relays.data.every((r) => r.example || !r.enabled || (!r.pool && !r.name));
+
   const alerts: { tone: 'bad' | 'warn'; text: string }[] = [];
   for (const c of [...(active.data?.results ?? []), ...(finished.data?.results ?? [])]) {
     if (c.sent >= 20 && c.bounces / c.sent >= BOUNCE_ALERT) {
@@ -60,6 +63,14 @@ export function Home() {
           <Link className="btn btn-primary" to="/campagnes/nouvelle"><Icon name="plus" /> Nouvelle campagne</Link>
         )}
       </header>
+
+      {noRealServer && (
+        <div className="alert alert-bad alert-stack" role="alert">
+          <p className="strong">Aucun serveur d’envoi configuré : vos campagnes ne partiront pas.</p>
+          <p className="small">Relais a besoin de l’adresse d’envoi de votre domaine (OVH, Google, Microsoft, Brevo…). Deux minutes suffisent.</p>
+          {can('settings:manage') && <Link className="btn btn-primary self-start" to="/relais/nouveau"><Icon name="plus" /> Configurer mon serveur d’envoi</Link>}
+        </div>
+      )}
 
       {alerts.length > 0 && (
         <section className="alerts" aria-label="À surveiller">

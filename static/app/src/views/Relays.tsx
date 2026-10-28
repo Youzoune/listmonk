@@ -172,10 +172,35 @@ function RelayEditor({ relay }: { relay: Relay }) {
       )}
 
       {relay.pool ? (
-        <p className="note">
-          Le relais par défaut répartit les envois sur les serveurs SMTP partagés. Il suit la cadence globale de l’instance.
-          Pour régler une cadence ou un warm-up, donnez un nom au serveur dans Réglages › Serveurs SMTP : il devient un relais à part.
-        </p>
+        <>
+          {relay.example && (
+            <div className="alert alert-bad alert-stack" role="alert">
+              <p className="strong">Aucun vrai serveur d’envoi : les campagnes ne partiront pas.</p>
+              <p className="small">
+                {relay.servers ? 'Les serveurs ci-dessous sont les exemples créés à l’installation.' : 'Le relais par défaut n’a aucun serveur actif.'}
+                {' '}Ajoutez votre adresse d’envoi : elle remplacera les exemples.
+              </p>
+              {can('settings:manage') && <Link className="btn btn-primary self-start" to="/relais/nouveau"><Icon name="plus" /> Configurer mon serveur d’envoi</Link>}
+            </div>
+          )}
+          <h3>Serveurs utilisés</h3>
+          {(relay.members ?? []).length === 0 ? <p className="small muted">Aucun.</p> : (
+            <ul className="member-list">
+              {(relay.members ?? []).map((m) => (
+                <li key={m.uuid || m.host}>
+                  <span className="mono">{m.host}:{m.port}</span>
+                  {m.name && <span className="sub">relais « {relayName(m)} »</span>}
+                  {m.example && <Chip tone="warn">Exemple, à remplacer</Chip>}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="note">
+            Le relais par défaut répartit les envois sur ces serveurs, au rythme global de l’instance. Pour qu’un serveur ait son propre
+            rythme et son warm-up, créez-le avec « Nouveau relais ».
+          </p>
+          {can('settings:manage') && <Link className="btn self-start" to="/reglages?onglet=smtp">Modifier les serveurs</Link>}
+        </>
       ) : (
         <>
           <h3>Projet</h3>
@@ -320,7 +345,8 @@ export function Relays() {
   // ?relais=ovh selects a relay just created.
   const asked = params.get('relais');
   const [selected, setSelected] = useState<string | null>(null);
-  const list = relays.data ?? [];
+  // Unnamed servers are part of the default relay: they're listed in it.
+  const list = (relays.data ?? []).filter((r) => r.pool || (r.name && r.name !== 'email'));
   const current = list.find((r) => (r.uuid || r.name) === selected)
     ?? (asked ? list.find((r) => r.name === asked || r.name === `email-${asked}`) : undefined)
     ?? list.find((r) => !r.pool) ?? list[0];
@@ -371,12 +397,12 @@ export function Relays() {
               return (
                 <button key={id} type="button" aria-current={current && (current.uuid || current.name) === id ? 'true' : undefined} onClick={() => setSelected(id)}>
                   <span className="relay-name">
-                    <span className={`status-dot ${!r.enabled ? 'off' : r.status && !r.status.open_now ? 'warn' : 'ok'}`} aria-hidden="true" />
+                    <span className={`status-dot ${r.example ? 'bad' : !r.enabled ? 'off' : r.status && !r.status.open_now ? 'warn' : 'ok'}`} aria-hidden="true" />
                     <span className="strong">{relayName(r)}</span>
                     {r.project_id !== 0 && <Chip tone="brand">Projet</Chip>}
                   </span>
                   <span className="sub">
-                    {r.pool ? `${r.servers ?? 0} serveur(s) partagé(s)` : cadenceSummary(r.cadence, r.warmup)}
+                    {r.pool ? (r.example ? 'Aucun vrai serveur : rien ne part' : `${r.servers ?? 0} serveur(s) partagé(s)`) : cadenceSummary(r.cadence, r.warmup)}
                     {r.status ? ` · ${num(r.status.sent_today)} aujourd’hui` : ''}
                   </span>
                 </button>
