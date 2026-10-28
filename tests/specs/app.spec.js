@@ -91,7 +91,7 @@ test.describe('Relais app', () => {
     const list = page.getByRole('navigation', { name: 'Relais' });
     await expect(list.getByRole('button', { name: /Relais par défaut/ })).toBeVisible();
     await list.getByRole('button', { name: /Relais par défaut/ }).click();
-    await expect(page.locator('.relay-detail')).toContainText('serveurs SMTP partagés');
+    await expect(page.locator('.relay-detail')).toContainText('Serveurs utilisés');
   });
 
   test('creates and launches a campaign with readable variables', async ({ page }) => {

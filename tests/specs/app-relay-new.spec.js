@@ -59,4 +59,39 @@ test.describe('New sending relay', () => {
     expect(s.cadence.per_minute).toBe(5);
     expect(s.warmup.enabled).toBe(true);
   });
+
+  test('warns while only the installer examples exist, and the wizard replaces them', async ({ page }) => {
+    // Back to the servers of a fresh install.
+    const cur = (await (await page.request.get('/api/settings')).json()).data;
+    const example = { ...cur.smtp[0], uuid: '', name: '', host: 'smtp.yoursite.com', port: 25, username: 'username', password: 'password',
+      auth_protocol: 'cram', tls_type: 'STARTTLS', project_id: 0, exclude_from_default: false, enabled: true };
+    await page.request.put('/api/settings', { data: { ...cur, smtp: [example] } });
+    await expect.poll(async () => (await page.request.get('/api/relays')).ok(), { timeout: 20000 }).toBe(true);
+    await expect.poll(async () => (await (await page.request.get('/api/relays')).json()).data[0].example, { timeout: 20000 }).toBe(true);
+
+    await page.goto('/app');
+    await expect(page.getByRole('alert')).toContainText('Aucun serveur d’envoi configuré');
+    await page.goto('/app/relais');
+    await page.locator('.relay-list').getByRole('button', { name: /Relais par défaut/ }).click();
+    await expect(page.locator('.relay-detail')).toContainText('Exemple, à remplacer');
+    await expect(page.locator('.relay-list')).not.toContainText('smtp.yoursite.com');
+
+    await page.getByRole('link', { name: 'Configurer mon serveur d’envoi' }).first().click();
+    await page.getByRole('button', { name: /Un autre fournisseur/ }).click();
+    await page.getByLabel('Serveur SMTP').fill(SMTP_HOST);
+    await page.getByLabel('Port').fill(SMTP_PORT);
+    await page.getByLabel('Chiffrement').selectOption('none');
+    await page.getByLabel('Authentification').selectOption('none');
+    await page.getByLabel('Nom du relais').fill('principal');
+    await page.getByRole('button', { name: 'Continuer' }).click();
+    await expect(page.getByLabel(/Remplacer les serveurs d’exemple/)).toBeChecked();
+    await page.getByRole('button', { name: 'Créer le relais' }).click();
+    await expect(page).toHaveURL(/relais=principal/, { timeout: 30000 });
+
+    const smtp = (await (await page.request.get('/api/settings')).json()).data.smtp;
+    expect(smtp.some((x) => x.host === 'smtp.yoursite.com')).toBe(false);
+    expect(smtp.some((x) => x.name.replace(/^email-/, '') === 'principal')).toBe(true);
+    await page.goto('/app');
+    await expect(page.getByText('Aucun serveur d’envoi configuré')).toHaveCount(0);
+  });
 });

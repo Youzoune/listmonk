@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
+import { Link } from 'react-router';
 import { api, query } from '../api/client';
 import { ErrorState, Explain, Field, Icon, Loading } from '../components/ui';
 import { num } from '../lib/format';
@@ -75,6 +76,16 @@ export function Maintenance() {
           <h1>Maintenance</h1>
         </div>
       </header>
+
+      {can('settings:manage') && (
+        <section className="panel empty-cta">
+          <div>
+            <p className="strong">Importer depuis listmonk</p>
+            <p className="small muted">Reprendre une autre instance : listes, contacts, modèles, campagnes et serveurs d’envoi.</p>
+          </div>
+          <Link className="btn" to="/migration">Ouvrir l’import</Link>
+        </section>
+      )}
 
       <section className="panel">
         <h2>Système</h2>

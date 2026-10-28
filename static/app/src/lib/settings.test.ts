@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Settings } from '../api/types';
 import { forEditing, isMasked, settingsForSave } from './settings';
-import { SMTP_PRESETS, applySmtpPreset, forSave, freeRelayName, newSmtpServer, smtpErrors } from './smtp';
+import { SMTP_PRESETS, applySmtpPreset, forSave, freeRelayName, isExampleServer, newSmtpServer, smtpErrors } from './smtp';
 
 const base = {
   smtp: [{ ...newSmtpServer(), uuid: 'a', name: 'email-ovh', host: 'ssl0.ovh.net', username: 'x@y.fr', password: '••••••' }],
@@ -73,5 +73,13 @@ describe('freeRelayName', () => {
     expect(freeRelayName('ovh', [])).toBe('ovh');
     expect(freeRelayName('ovh', [{ name: 'email-ovh' }, { name: 'ovh-2' }])).toBe('ovh-3');
     expect(freeRelayName('Mon Serveur !', [])).toBe('mon-serveur');
+  });
+});
+
+describe('isExampleServer', () => {
+  it('spots the installer placeholders', () => {
+    expect(isExampleServer({ host: 'smtp.yoursite.com', username: 'username' })).toBe(true);
+    expect(isExampleServer({ host: 'smtp.gmail.com', username: 'username@gmail.com' })).toBe(true);
+    expect(isExampleServer({ host: 'ssl0.ovh.net', username: 'contact@youzoune.com' })).toBe(false);
   });
 });

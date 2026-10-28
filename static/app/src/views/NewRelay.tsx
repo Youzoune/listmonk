@@ -6,7 +6,7 @@ import { ErrorState, Explain, Field, Icon, Loading } from '../components/ui';
 import { PRESETS, applyPreset } from '../lib/presets';
 import { cadenceSummary, today } from '../lib/relays';
 import { settingsForSave } from '../lib/settings';
-import { SMTP_PRESETS, applySmtpPreset, freeRelayName, newSmtpServer, smtpErrors } from '../lib/smtp';
+import { SMTP_PRESETS, applySmtpPreset, freeRelayName, isExampleServer, newSmtpServer, smtpErrors } from '../lib/smtp';
 import { useProject } from '../project';
 
 const STEPS = ['Fournisseur', 'Connexion', 'Rythme d’envoi'];
@@ -28,6 +28,7 @@ export function NewRelay() {
   const [paceId, setPaceId] = useState<string | null>(null);
   const [testTo, setTestTo] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [replaceExamples, setReplaceExamples] = useState(true);
 
   const existing = useMemo(() => settings.data?.smtp ?? [], [settings.data]);
   const provider = SMTP_PRESETS.find((p) => p.id === providerId);
@@ -54,6 +55,9 @@ export function NewRelay() {
   const connectionErrors = Object.entries(errors).filter(([k]) => ['host', 'port', 'username', 'name'].includes(k));
   const passwordMissing = server.auth_protocol !== 'none' && !server.password;
   const pace = PRESETS.find((p) => p.id === paceId);
+  const examples = existing.filter(isExampleServer);
+  // A relay reserved to a project isn't in the default relay: the examples can't go then.
+  const dropExamples = replaceExamples && examples.length > 0 && !reserved;
 
   const finish = () => {
     setSubmitted(true);
@@ -61,7 +65,8 @@ export function NewRelay() {
     const { cadence, warmup } = pace
       ? applyPreset(pace, full.cadence, { ...full.warmup, since: today() })
       : { cadence: full.cadence, warmup: full.warmup };
-    const out = settingsForSave({ ...settings.data, smtp: [...settings.data.smtp, { ...full, cadence, warmup }] });
+    const kept = dropExamples ? settings.data.smtp.filter((s) => !isExampleServer(s)) : settings.data.smtp;
+    const out = settingsForSave({ ...settings.data, smtp: [...kept, { ...full, cadence, warmup }] });
     if (!('settings' in out)) return;
     save.mutate(out.settings, { onSuccess: () => navigate(`/relais?relais=${encodeURIComponent(full.name)}`) });
   };
@@ -210,6 +215,19 @@ export function NewRelay() {
                   );
                 })}
               </div>
+              {examples.length > 0 && (
+                <>
+                  <label className="switch" htmlFor="nr-replace">
+                    <input id="nr-replace" type="checkbox" checked={replaceExamples && !reserved} disabled={reserved} onChange={(e) => setReplaceExamples(e.target.checked)} />
+                    <span>Remplacer les serveurs d’exemple de l’installation ({examples.map((s) => s.host).join(', ')})</span>
+                  </label>
+                  <p className="small muted">
+                    {reserved
+                      ? 'Un relais réservé à un projet ne remplace pas le relais par défaut : les exemples restent, à remplacer plus tard.'
+                      : 'Ils ne peuvent rien envoyer. Votre serveur devient aussi celui du relais par défaut.'}
+                  </p>
+                </>
+              )}
               {save.isError && <ErrorState error={save.error} />}
             </>
           )}
